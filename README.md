@@ -74,11 +74,6 @@ cloud:
      ```
 
 
-4.	Concurrent Experimentation
-For multiple concurrent experiments from the same directory, set the run_from_copy flag to True in run.yaml. This ensures each run uses a unique directory, stored at the `cry_copy_dir` path.
-
-
-
 ### View Logs
 
 Fetch and display logs for a specific job by providing its hash (or part of it):
