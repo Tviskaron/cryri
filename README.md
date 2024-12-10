@@ -35,8 +35,8 @@ cryri run.yaml
 container:
   image: "cr.ai.cloud.ru/751eb210-f812-4ecf-a18b-6646f0914218/job-custom-image-follower" # Docker image for the job
   command: python3 example.py --map_name test-mazes-s40_wc4_od30 --num_agents 128        # Command to execute in the container
-  environment:                                                                           # Environment variables
-    "WANDB_API_KEY": "<YOUR KEY>"
+#  environment:                                                                          # Environment variables
+#    "WANDB_API_KEY": "<YOUR KEY>"
   work_dir: '.'                                                                          # Local working directory, recommend leaving as default
   run_from_copy: False                                                                   # Whether to run from a copy of the working directory
   cry_copy_dir: "/home/jovyan/<LOCAL FOLDER>/.cryri"                                     # Local path for creating working directory copies
