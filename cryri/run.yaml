@@ -1,0 +1,12 @@
+container:
+  image: "cr.ai.cloud.ru/751eb210-f812-4ecf-a18b-6646f0914218/job-custom-image-follower"
+  command: python3 example.py --map_name test-mazes-s40_wc4_od30 --num_agents 128
+  environment:
+    "WANDB_API_KEY": "<YOUR KEY>"
+  work_dir: '.'
+  run_from_copy: False
+  cry_copy_dir: "/home/jovyan/<LOCAL FOLDER>/.cryri"
+cloud:
+  region: "SR006"
+  instance_type: "a100plus.1gpu.80vG.12C.96G"
+  n_workers: 1
