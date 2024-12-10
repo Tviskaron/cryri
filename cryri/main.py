@@ -1,7 +1,7 @@
 import hashlib
 import shutil
 from datetime import datetime
-from typing import List, Dict
+from typing import Dict
 from contextlib import redirect_stdout
 
 import argparse
@@ -110,10 +110,8 @@ def main():
         help="Provide the hash of the job to terminate it."
     )
 
-    # Parse the arguments
     args = parser.parse_args()
-    print("Parsed arguments:", args)
-    # Handle the different options
+
     if args.logs:
         print(f"Fetching logs for container with hash: {args.logs}")
 
