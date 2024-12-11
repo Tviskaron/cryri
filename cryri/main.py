@@ -48,7 +48,7 @@ def submit_run(cfg):
 
         cfg.container.work_dir = run_folder
 
-    mnist_tf_run = client_lib.Job(
+    run = client_lib.Job(
         base_image=cfg.container.image,
         script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
         instance_type=cfg.cloud.instance_type,
@@ -58,7 +58,7 @@ def submit_run(cfg):
         env_variables=cfg.container.environment
     )
 
-    status = mnist_tf_run.submit()
+    status = run.submit()
 
     return status
 
