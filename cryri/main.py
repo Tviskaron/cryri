@@ -58,7 +58,9 @@ def submit_run(cfg):
         env_variables=cfg.container.environment
     )
 
-    mnist_tf_run.submit()
+    status = mnist_tf_run.submit()
+
+    return status
 
 
 def raw_job_to_id(job_string):
@@ -140,7 +142,8 @@ def main():
         try:
             with open(args.config_file, "r") as file:
                 cfg = CryConfig(**yaml.safe_load(file))
-                submit_run(cfg)
+                status = submit_run(cfg)
+                print(f"Job submitted with status: {status}")
         except FileNotFoundError:
             print(f"Error: Configuration file '{args.config_file}' not found.")
         except yaml.YAMLError as e:
