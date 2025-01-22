@@ -10,3 +10,5 @@ cloud:
   region: "SR006"
   instance_type: "a100plus.1gpu.80vG.12C.96G"
   n_workers: 1
+  priority: "medium"
+  description: "test job"
