@@ -44,7 +44,9 @@ container:
 cloud:
   region: "SR006"                                                                        # Cloud region to deploy the job
   instance_type: "a100plus.1gpu.80vG.12C.96G"                                            # Type of cloud instance
-  n_workers: 1                                                                           # Number of worker instances, 1 is only option 
+  n_workers: 1                                                                           # Number of worker instances, 1 is only option
+  priority: "medium"                                                                     # Job priority. Options: ['high', 'medium', 'low']
+  description: "test job"                                                                # Job description 
 ```
 
 ### Typical Use Case

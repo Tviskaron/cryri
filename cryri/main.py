@@ -29,6 +29,8 @@ class CloudConfig(BaseModel):
     region: str = "SR006"
     instance_type: str = None
     n_workers: int = 1
+    priority: str = "medium"
+    description: str = None
 
 
 class CryConfig(BaseModel):
@@ -55,7 +57,9 @@ def submit_run(cfg):
         n_workers=1,
         region=cfg.cloud.region,
         type='binary',
-        env_variables=cfg.container.environment
+        env_variables=cfg.container.environment,
+        priority_class=cfg.cloud.priority,
+        job_desc=cfg.cloud.description,
     )
 
     status = mnist_tf_run.submit()
