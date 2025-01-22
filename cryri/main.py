@@ -1,3 +1,4 @@
+import os
 import hashlib
 import shutil
 from datetime import datetime
@@ -50,7 +51,10 @@ def submit_run(cfg):
 
         cfg.container.work_dir = run_folder
 
-    run = client_lib.Job(
+    job_description = create_job_description(cfg)
+    print(f"Submitting job with description: {job_description}")
+
+    mnist_tf_run = client_lib.Job(
         base_image=cfg.container.image,
         script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
         instance_type=cfg.cloud.instance_type,
@@ -59,13 +63,25 @@ def submit_run(cfg):
         type='binary',
         env_variables=cfg.container.environment,
         priority_class=cfg.cloud.priority,
-        job_desc=cfg.cloud.description,
+        job_desc=job_description,
     )
 
-    status = run.submit()
+    status = mnist_tf_run.submit()
 
     return status
 
+def create_job_description(cfg):
+    team_name = None
+    if cfg.container.environment is not None:
+        team_name = cfg.container.environment.get("TEAM_NAME", None)
+    if team_name is None:
+        team_name = os.environ.get('TEAM_NAME', None)
+    job_description = cfg.cloud.description
+    if job_description is None:
+        job_description = str(Path(cfg.container.work_dir).resolve()).replace('/home/jovyan/', '').replace('/', '-')
+    if team_name is not None:
+        job_description = f"{team_name}-{job_description}"
+    return job_description
 
 def raw_job_to_id(job_string):
     return job_string.split(" : ")[1].strip()

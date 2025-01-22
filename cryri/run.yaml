@@ -3,6 +3,7 @@ container:
   command: python3 example.py --map_name test-mazes-s40_wc4_od30 --num_agents 128
   environment:
     "WANDB_API_KEY": "<YOUR KEY>"
+    "TEAM_NAME": "CogAI"
   work_dir: '.'
   run_from_copy: False
   cry_copy_dir: "/home/jovyan/<LOCAL FOLDER>/.cryri"
