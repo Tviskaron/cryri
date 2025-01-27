@@ -18,8 +18,18 @@ pip install git+https://github.com/Tviskaron/cryri.git
 View all currently running jobs in the configured cloud environment:
 
 ```bash
-cryri --jobs
+cryri --jobs --region SR006
 ```
+
+### List Available Instance Types For Cloud region
+
+
+View all currently running jobs in the configured cloud environment:
+
+```bash
+cryri --instance_types --region SR006
+```
+
 
 ### Submit Jobs
 
@@ -81,12 +91,12 @@ cloud:
 
 Fetch and display logs for a specific job by providing its hash (or part of it):
 ```bash
-cryri --logs b593837e6a55
+cryri --logs b593837e6a55 --region SR006
 ```
 
 ### Kill Jobs
 
 Terminate a specific running job using its hash:
 ```bash
-cryri --kill b593837e6a55
+cryri --kill b593837e6a55 --region SR006
 ```
