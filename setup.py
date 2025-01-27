@@ -42,7 +42,8 @@ setup(
     install_requires=[
         "pyyaml",
         "pydantic",
-        "argparse"
+        "argparse",
+        "rich"
     ],
     package_data={'cryri': ['run.yaml']},
     include_package_data=True,
