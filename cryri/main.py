@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Dict
 from contextlib import redirect_stdout
 
+from rich.console import Console
+
 import argparse
 import yaml
 from pydantic import BaseModel
@@ -99,6 +101,18 @@ def get_jobs(region):
 
     return output.splitlines()
 
+def get_instance_types(region):
+
+    return client_lib.get_instance_types(regions=region)
+
+
+def _config_from_args(args):
+    cloud_cfg = CloudConfig()
+    if args.region is not None:
+        cloud_cfg.region = args.region
+
+    cfg = CryConfig(cloud=cloud_cfg)
+    return cfg
 
 def main():
     parser = argparse.ArgumentParser(description="Script for managing runs and logs.")
@@ -132,27 +146,45 @@ def main():
         help="Provide the hash of the job to terminate it."
     )
 
+    # Option 4: Get instance types
+    parser.add_argument(
+        "--instance_types",
+        action="store_true",
+        help="Display types of available instances."
+    )
+
+    parser.add_argument(
+        "--region",
+        metavar="SR004 / SR006",
+        help="Provide cloud region."
+    )
+
     args = parser.parse_args()
 
     if args.logs:
-        print(f"Fetching logs for container with hash: {args.logs}")
-
-        cfg = CryConfig()
+        cfg = _config_from_args(args)
+        print(f"[region={cfg.cloud.region}]Fetching logs for container with hash: {args.logs}")
         for job_name in get_jobs(region=cfg.cloud.region):
             job_hash = raw_job_to_id(job_name)
             if args.logs in job_hash:
                 client_lib.logs(job_hash, region=cfg.cloud.region)
                 break
+    elif args.instance_types:
+        cfg = _config_from_args(args)
+        print(f"[region={cfg.cloud.region}] Displaying instance types:")
+        instance_types_table = get_instance_types(region=cfg.cloud.region)
 
+        console = Console()
+        console.print(instance_types_table)
     elif args.jobs:
-        print("Displaying runned jobs:")
-        cfg = CryConfig()
+        cfg = _config_from_args(args)
+        print(f"[region={cfg.cloud.region}] Displaying runned jobs:")
         user_jobs = get_jobs(region=cfg.cloud.region)
         for job in user_jobs:
             print(job)
     elif args.kill:
-        print(f"Removing job with hash: {args.kill}")
-        cfg = CryConfig()
+        cfg = _config_from_args(args)
+        print(f"[region={cfg.cloud.region}] Removing job with hash: {args.kill}")
         for job_name in get_jobs(region=cfg.cloud.region):
             job_hash = raw_job_to_id(job_name)
             if args.kill in job_hash:
