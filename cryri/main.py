@@ -26,6 +26,7 @@ class ContainerConfig(BaseModel):
     work_dir: str = None
     run_from_copy: bool = False
     cry_copy_dir: str = None
+    exclude_from_copy: list = []
 
 
 class CloudConfig(BaseModel):
@@ -49,8 +50,12 @@ def submit_run(cfg):
         hash_suffix = hashlib.sha1(datetime.now().strftime("%Y%m%d_%H%M%S").encode()).hexdigest()[:6]
         run_name = f"run_{now}_{hash_suffix}"
         run_folder = Path(cfg.container.cry_copy_dir) / run_name
-        shutil.copytree(copy_from_folder, run_folder)
-
+        ignore_fun = shutil.ignore_patterns(*cfg.container.exclude_from_copy)
+        shutil.copytree(
+            copy_from_folder, 
+            run_folder,
+            ignore=ignore_fun
+        )
         cfg.container.work_dir = run_folder
 
     job_description = create_job_description(cfg)
