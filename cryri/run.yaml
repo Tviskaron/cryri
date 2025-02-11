@@ -7,6 +7,10 @@ container:
   work_dir: '.'
   run_from_copy: False
   cry_copy_dir: "/home/jovyan/<LOCAL FOLDER>/.cryri"
+  exclude_from_copy:
+    - ".git/"
+    - "data/"
+    - "*.pth"
 cloud:
   region: "SR006"
   instance_type: "a100plus.1gpu.80vG.12C.96G"
