@@ -32,6 +32,7 @@ class CloudConfig(BaseModel):
     region: str = "SR006"
     instance_type: str = None
     n_workers: int = 1
+    processes_per_worker: int = 1
     priority: str = "medium"
     description: str = None
 
@@ -60,7 +61,8 @@ def submit_run(cfg):
         base_image=cfg.container.image,
         script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
         instance_type=cfg.cloud.instance_type,
-        n_workers=1,
+        n_workers=cfg.cloud.n_workers,
+        processes_per_worker=cfg.cloud.processes_per_worker,
         region=cfg.cloud.region,
         type='binary',
         env_variables=cfg.container.environment,
