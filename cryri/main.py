@@ -1,22 +1,30 @@
 import os
 import hashlib
 import shutil
+import logging
+import argparse
+from pathlib import Path
+
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List, Optional
 from contextlib import redirect_stdout
 
-from rich.console import Console
-
-import argparse
-import yaml
-from pydantic import BaseModel
-from pathlib import Path
 import io
+import yaml
+
+from rich.console import Console
+from pydantic import BaseModel
+
+# Constants
+DEFAULT_REGION = "SR006"
+DEFAULT_PRIORITY = "medium"
+DATETIME_FORMAT = "%Y_%m_%d_%H%M"
+HASH_LENGTH = 6
 
 try:
     import client_lib
 except ImportError:
-    pass
+    logging.warning("client_lib not found. Some functionality may be limited.")
 
 
 class ContainerConfig(BaseModel):
@@ -34,6 +42,7 @@ class CloudConfig(BaseModel):
     n_workers: int = 1
     priority: str = "medium"
     description: str = None
+    tags: List[str] = []
 
 
 class CryConfig(BaseModel):
@@ -41,38 +50,88 @@ class CryConfig(BaseModel):
     cloud: CloudConfig = CloudConfig()
 
 
-def submit_run(cfg):
+class JobManager:
+    def __init__(self, region: str):
+        self.region = region
+        self.console = Console()
+
+    def get_jobs(self) -> List[str]:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            client_lib.jobs(region=self.region)
+        output = buffer.getvalue()
+        buffer.close()
+        return output.splitlines()
+
+    def find_job_by_hash(self, partial_hash: str) -> Optional[str]:
+        """Find a job by partial hash match. Returns full hash if found, None otherwise."""
+        for job_name in self.get_jobs():
+            job_hash = self.raw_job_to_id(job_name)
+            if partial_hash in job_hash:
+                return job_hash
+        return None
+
+    @staticmethod
+    def raw_job_to_id(job_string: str) -> str:
+        return job_string.split(" : ")[1].strip()
+
+    def get_instance_types(self):
+        return client_lib.get_instance_types(regions=self.region)
+
+    def show_logs(self, job_hash: str) -> None:
+        full_hash = self.find_job_by_hash(job_hash)
+        if full_hash:
+            client_lib.logs(full_hash, region=self.region)
+        else:
+            logging.error("No job found with hash: %s", job_hash)
+
+    def kill_job(self, job_hash: str) -> None:
+        full_hash = self.find_job_by_hash(job_hash)
+        if full_hash:
+            client_lib.kill(full_hash, region=self.region)
+            logging.info("Job %s terminated successfully", full_hash)
+        else:
+            logging.error("No job found with hash: %s", job_hash)
+
+
+def submit_run(cfg: CryConfig) -> str:
+    """Submit a job run with the given configuration."""
     if cfg.container.run_from_copy and cfg.container.cry_copy_dir:
-        copy_from_folder = Path(cfg.container.work_dir).parent.resolve()
-
-        now = datetime.now().strftime("%Y_%m_%d_%H%M")
-        hash_suffix = hashlib.sha1(datetime.now().strftime("%Y%m%d_%H%M%S").encode()).hexdigest()[:6]
-        run_name = f"run_{now}_{hash_suffix}"
-        run_folder = Path(cfg.container.cry_copy_dir) / run_name
-        shutil.copytree(copy_from_folder, run_folder)
-
-        cfg.container.work_dir = run_folder
+        cfg.container.work_dir = _create_run_copy(cfg)
 
     job_description = create_job_description(cfg)
-    print(f"Submitting job with description: {job_description}")
+    logging.info("Submitting job with description: %s", job_description)
 
-    mnist_tf_run = client_lib.Job(
-        base_image=cfg.container.image,
-        script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
-        instance_type=cfg.cloud.instance_type,
-        n_workers=1,
-        region=cfg.cloud.region,
-        type='binary',
-        env_variables=cfg.container.environment,
-        priority_class=cfg.cloud.priority,
-        job_desc=job_description,
-    )
+    try:
+        job = client_lib.Job(
+            base_image=cfg.container.image,
+            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
+            instance_type=cfg.cloud.instance_type,
+            n_workers=cfg.cloud.n_workers,
+            region=cfg.cloud.region,
+            type='binary',
+            env_variables=cfg.container.environment,
+            priority_class=cfg.cloud.priority,
+            job_desc=job_description,
+        )
+        return job.submit()
+    except Exception as e:
+        logging.error("Failed to submit job: %s", e)
+        raise
 
-    status = mnist_tf_run.submit()
 
-    return status
+def _create_run_copy(cfg: CryConfig) -> Path:
+    """Create a copy of the work directory for the run."""
+    copy_from_folder = Path(cfg.container.work_dir).parent.resolve()
+    now = datetime.now().strftime(DATETIME_FORMAT)
+    hash_suffix = hashlib.sha1(datetime.now().strftime(f"{DATETIME_FORMAT}S").encode()).hexdigest()[:HASH_LENGTH]
+    run_name = f"run_{now}_{hash_suffix}"
+    run_folder = Path(cfg.container.cry_copy_dir) / run_name
+    shutil.copytree(copy_from_folder, run_folder)
+    return run_folder
 
-def create_job_description(cfg):
+
+def create_job_description(cfg: CryConfig):
     team_name = None
     if cfg.container.environment is not None:
         team_name = cfg.container.environment.get("TEAM_NAME", None)
@@ -83,27 +142,11 @@ def create_job_description(cfg):
         job_description = str(Path(cfg.container.work_dir).resolve()).replace('/home/jovyan/', '').replace('/', '-')
     if team_name is not None:
         job_description = f"{team_name}-{job_description}"
+
+    if cfg.cloud.tags:
+        job_description = f"{job_description} {' '.join(cfg.cloud.tags)}"
+
     return job_description
-
-def raw_job_to_id(job_string):
-    return job_string.split(" : ")[1].strip()
-
-
-def get_jobs(region):
-    # Redirect stdout to capture the output
-    buffer = io.StringIO()
-
-    with redirect_stdout(buffer):
-        client_lib.jobs(region=region)
-    # Extract captured output
-    output = buffer.getvalue()
-    buffer.close()
-
-    return output.splitlines()
-
-def get_instance_types(region):
-
-    return client_lib.get_instance_types(regions=region)
 
 
 def _config_from_args(args):
@@ -114,7 +157,10 @@ def _config_from_args(args):
     cfg = CryConfig(cloud=cloud_cfg)
     return cfg
 
+
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
     parser = argparse.ArgumentParser(description="Script for managing runs and logs.")
 
     # Default mode: Run configuration from a YAML file
@@ -160,48 +206,42 @@ def main():
     )
 
     args = parser.parse_args()
+    cfg = _config_from_args(args)
 
-    if args.logs:
-        cfg = _config_from_args(args)
-        print(f"[region={cfg.cloud.region}]Fetching logs for container with hash: {args.logs}")
-        for job_name in get_jobs(region=cfg.cloud.region):
-            job_hash = raw_job_to_id(job_name)
-            if args.logs in job_hash:
-                client_lib.logs(job_hash, region=cfg.cloud.region)
-                break
-    elif args.instance_types:
-        cfg = _config_from_args(args)
-        print(f"[region={cfg.cloud.region}] Displaying instance types:")
-        instance_types_table = get_instance_types(region=cfg.cloud.region)
+    job_manager = JobManager(cfg.cloud.region)
 
-        console = Console()
-        console.print(instance_types_table)
-    elif args.jobs:
-        cfg = _config_from_args(args)
-        print(f"[region={cfg.cloud.region}] Displaying runned jobs:")
-        user_jobs = get_jobs(region=cfg.cloud.region)
-        for job in user_jobs:
-            print(job)
-    elif args.kill:
-        cfg = _config_from_args(args)
-        print(f"[region={cfg.cloud.region}] Removing job with hash: {args.kill}")
-        for job_name in get_jobs(region=cfg.cloud.region):
-            job_hash = raw_job_to_id(job_name)
-            if args.kill in job_hash:
-                client_lib.kill(job_hash, region=cfg.cloud.region)
-    elif args.config_file:
-        print(f"Running configuration from: {args.config_file}")
-        try:
-            with open(args.config_file, "r") as file:
-                cfg = CryConfig(**yaml.safe_load(file))
-                status = submit_run(cfg)
-                print(f"Job submitted with status: {status}")
-        except FileNotFoundError:
-            print(f"Error: Configuration file '{args.config_file}' not found.")
-        except yaml.YAMLError as e:
-            print(f"Error parsing YAML file: {e}")
-    else:
-        print("No valid arguments provided. Use --help for more information.")
+    try:
+        if args.logs:
+            job_manager.show_logs(args.logs)
+        elif args.instance_types:
+            instance_types_table = job_manager.get_instance_types()
+            job_manager.console.print(instance_types_table)
+        elif args.jobs:
+            for job in job_manager.get_jobs():
+                print(job)
+        elif args.kill:
+            job_manager.kill_job(args.kill)
+        elif args.config_file:
+            _handle_config_file(args.config_file)
+        else:
+            logging.warning("No valid arguments provided. Use --help for more information.")
+    except Exception as e:
+        logging.error("An error occurred: %s", e)
+        raise
+
+
+def _handle_config_file(config_file: str) -> None:
+    """Handle the configuration file processing and job submission."""
+    logging.info("Running configuration from: %s", config_file)
+    try:
+        with open(config_file, "r", encoding="utf-8") as file:
+            cfg = CryConfig(**yaml.safe_load(file))
+            status = submit_run(cfg)
+            logging.info("Job submitted with status: %s", status)
+    except FileNotFoundError:
+        logging.error("Configuration file '%s' not found.", config_file)
+    except yaml.YAMLError as e:
+        logging.error("Error parsing YAML file: %s", e)
 
 
 if __name__ == '__main__':
