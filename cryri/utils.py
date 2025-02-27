@@ -3,12 +3,12 @@ import hashlib
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from .config import CryConfig
 
 DATETIME_FORMAT = "%Y_%m_%d_%H%M"
 HASH_LENGTH = 6
+
 
 def create_job_description(cfg: CryConfig) -> str:
     team_name = None
@@ -27,6 +27,7 @@ def create_job_description(cfg: CryConfig) -> str:
         job_description = f"{job_description} {' '.join(tags_with_prefix)}"
 
     return job_description
+
 
 def create_run_copy(cfg: CryConfig) -> Path:
     """Create a copy of the work directory for the run."""

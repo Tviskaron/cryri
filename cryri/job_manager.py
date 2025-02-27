@@ -9,6 +9,7 @@ try:
 except ImportError:
     logging.warning("client_lib not found. Some functionality may be limited.")
 
+
 class JobManager:
     def __init__(self, region: str):
         self.region = region

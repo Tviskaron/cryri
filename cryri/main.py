@@ -1,7 +1,8 @@
 import logging
 import argparse
-import yaml
 from pathlib import Path
+
+import yaml
 
 from .config import CryConfig, CloudConfig
 from .job_manager import JobManager
@@ -11,6 +12,7 @@ try:
     import client_lib
 except ImportError:
     logging.warning("client_lib not found. Some functionality may be limited.")
+
 
 def submit_run(cfg: CryConfig) -> str:
     """Submit a job run with the given configuration."""
@@ -37,6 +39,7 @@ def submit_run(cfg: CryConfig) -> str:
         logging.error("Failed to submit job: %s", e)
         raise
 
+
 def _config_from_args(args):
     cloud_cfg = CloudConfig()
     if args.region is not None:
@@ -44,6 +47,7 @@ def _config_from_args(args):
 
     cfg = CryConfig(cloud=cloud_cfg)
     return cfg
+
 
 def _handle_config_file(config_file: str) -> None:
     """Handle the configuration file processing and job submission."""
@@ -57,6 +61,7 @@ def _handle_config_file(config_file: str) -> None:
         logging.error("Configuration file '%s' not found.", config_file)
     except yaml.YAMLError as e:
         logging.error("Error parsing YAML file: %s", e)
+
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -127,6 +132,7 @@ def main():
     except Exception as e:
         logging.error("An error occurred: %s", e)
         raise
+
 
 if __name__ == '__main__':
     main()
