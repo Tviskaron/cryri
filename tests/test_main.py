@@ -1,3 +1,5 @@
+# pylint: disable=redefined-outer-name
+
 import pytest
 from cryri.config import CryConfig, ContainerConfig, CloudConfig
 from cryri.job_manager import JobManager

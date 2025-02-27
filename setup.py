@@ -38,5 +38,11 @@ setup(
         "pydantic",
         "rich",
         "pyyaml",
+        "argparse",
     ],
+    extras_require={
+        'test': ['pytest'],
+        'lint': ['flake8', 'pylint'],
+    },
+
 )
