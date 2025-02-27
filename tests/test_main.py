@@ -1,12 +1,8 @@
 import pytest
 from pathlib import Path
-from cryri.main import (
-    CryConfig,
-    ContainerConfig,
-    CloudConfig,
-    JobManager,
-    create_job_description
-)
+from cryri.config import CryConfig, ContainerConfig, CloudConfig
+from cryri.job_manager import JobManager
+from cryri.utils import create_job_description
 
 
 @pytest.fixture
@@ -42,16 +38,16 @@ def test_container_config_defaults():
 
 def test_create_job_description_basic(basic_config):
     description = create_job_description(basic_config)
-    assert description == "/test/dir"
+    assert description == "-test-dir"
 
 
 def test_create_job_description_with_team(basic_config):
     basic_config.container.environment = {"TEAM_NAME": "test-team"}
     description = create_job_description(basic_config)
-    assert description == "test-team-/test/dir"
+    assert description == "test-team--test-dir"
 
 
 def test_create_job_description_with_tags(basic_config):
     basic_config.cloud.tags = ["tag1", "tag2"]
     description = create_job_description(basic_config)
-    assert description == "/test/dir #tag1 #tag2"
+    assert description == "-test-dir #tag1 #tag2"
