@@ -31,24 +31,12 @@ def find_version(*file_paths):
 
 
 setup(
-    name='cryri',
-    author='Alexey Skrynnik',
-    license='MIT',
-    version=find_version("cryri", "__init__.py"),
-    description='Simplification of job-lib experimenting',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    url='https://github.com/Tviskaron/cryri',
+    name="cryri",
+    version="0.1.0",
+    packages=find_packages(),
     install_requires=[
-        "pyyaml",
         "pydantic",
-        "argparse",
-        "rich"
+        "rich",
+        "pyyaml",
     ],
-    package_data={'cryri': ['run.yaml']},
-    include_package_data=True,
-    package_dir={'': './'},
-    packages=find_packages(where='./', include='cryri*'),
-    entry_points={"console_scripts": ["cryri=cryri.main:main"], },
-    python_requires='>=3.6',
 )

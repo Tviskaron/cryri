@@ -144,7 +144,8 @@ def create_job_description(cfg: CryConfig):
         job_description = f"{team_name}-{job_description}"
 
     if cfg.cloud.tags:
-        job_description = f"{job_description} {' '.join(cfg.cloud.tags)}"
+        tags_with_prefix = [f"#{tag}" for tag in cfg.cloud.tags]
+        job_description = f"{job_description} {' '.join(tags_with_prefix)}"
 
     return job_description
 
