@@ -25,8 +25,8 @@ jobs:
 
     - name: Run Flake8
       run: |
-        PYTHONPATH=. flake8
+        PYTHONPATH=. flake8 cryri/ tests/
 
     - name: Run Pylint
       run: |
-        PYTHONPATH=. pylint cryri/
+        PYTHONPATH=. pylint cryri/ tests/

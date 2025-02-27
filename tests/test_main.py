@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from cryri.config import CryConfig, ContainerConfig, CloudConfig
 from cryri.job_manager import JobManager
 from cryri.utils import create_job_description
