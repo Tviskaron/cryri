@@ -39,6 +39,7 @@ setup(
         "rich",
         "pyyaml",
         "argparse",
+        "requests",
     ],
     extras_require={
         'test': ['pytest'],

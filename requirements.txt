@@ -2,3 +2,4 @@ pyyaml
 pydantic
 argparse
 rich
+requests
