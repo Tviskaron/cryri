@@ -4,9 +4,9 @@ from pathlib import Path
 
 import yaml
 
-from .config import CryConfig, CloudConfig
-from .job_manager import JobManager
-from .utils import create_job_description, create_run_copy
+from cryri.config import CryConfig, CloudConfig
+from cryri.job_manager import JobManager
+from cryri.utils import create_job_description, create_run_copy
 
 try:
     import client_lib
@@ -23,9 +23,10 @@ def submit_run(cfg: CryConfig) -> str:
     logging.info("Submitting job with description: %s", job_description)
 
     try:
+        quoted_command = cfg.container.command.replace('"', '\\"')
         job = client_lib.Job(
             base_image=cfg.container.image,
-            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
+            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {quoted_command}"',
             instance_type=cfg.cloud.instance_type,
             processes_per_worker=cfg.cloud.processes_per_worker,
             n_workers=cfg.cloud.n_workers,

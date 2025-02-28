@@ -1,9 +1,9 @@
 container:
-  image: "cr.ai.cloud.ru/751eb210-f812-4ecf-a18b-6646f0914218/job-custom-image-follower"
-  command: python3 example.py --map_name test-mazes-s40_wc4_od30 --num_agents 128
+  image: "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py310:0.0.36"
+  command: python3 -c 'print("Hello, world!")'
   environment:
-    "WANDB_API_KEY": "<YOUR KEY>"
-    "TEAM_NAME": "CogAI"
+    "WANDB_API_KEY": "abcdefghijklmnopqrstuvwxyz"
+    "TEAM_NAME": "ExampleTeam"
   work_dir: '.'
   run_from_copy: False
   cry_copy_dir: "/home/jovyan/<LOCAL FOLDER>/.cryri"
@@ -12,8 +12,8 @@ container:
     - "data/"
     - "*.pth"
 cloud:
-  region: "SR006"
-  instance_type: "a100plus.1gpu.80vG.12C.96G"
+  region: "SR004"
+  instance_type: "a100.1gpu"
   n_workers: 1
   priority: "medium"
-  description: "test job"
+  description: "Example Job"
