@@ -1,9 +1,10 @@
 import io
-import requests
 import logging
 import time
-from typing import List, Optional
 from contextlib import redirect_stdout
+
+from typing import List, Optional
+import requests
 from rich.console import Console
 
 try:
@@ -49,6 +50,7 @@ class JobManager:
             f"http://{client_lib.environment.GW_API_ADDR}/job_status",
             params={"job": job_hash, "region": self.region},
             headers={"X-Api-Key": client_lib.environment.GW_API_KEY, "X-Namespace": client_lib.environment.NAMESPACE},
+            timeout=60,
         )
         return r.json()
 
