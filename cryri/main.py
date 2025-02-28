@@ -42,15 +42,6 @@ def submit_run(cfg: CryConfig) -> str:
         raise
 
 
-def _config_from_args(args):
-    cloud_cfg = CloudConfig()
-    if args.region is not None:
-        cloud_cfg.region = args.region
-
-    cfg = CryConfig(cloud=cloud_cfg)
-    return cfg
-
-
 def _handle_config_file(config_file: str) -> None:
     """Handle the configuration file processing and job submission."""
     logging.info("Running configuration from: %s", config_file)
@@ -64,8 +55,8 @@ def _handle_config_file(config_file: str) -> None:
     except yaml.YAMLError as e:
         logging.error("Error parsing YAML file: %s", e)
 
-def get_instance_types(region):
 
+def get_instance_types(region):
     return client_lib.get_instance_types(regions=region)
 
 
@@ -76,6 +67,7 @@ def _config_from_args(args):
 
     cfg = CryConfig(cloud=cloud_cfg)
     return cfg
+
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

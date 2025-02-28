@@ -60,7 +60,11 @@ class JobManager:
                 if n_retries > self.fetch_logs_max_retries:
                     logging.error("Max retries reached, can't fetch logs for job %s", job_hash)
                     break
-                logging.info("Job status is %s. Retry fetching logs in %d seconds", job_status, self.job_status_interval)
+                logging.info(
+                    "Job status is %s. Retry in %d seconds",
+                    job_status,
+                    self.job_status_interval,
+                )
                 time.sleep(self.job_status_interval)
                 n_retries += 1
             else:

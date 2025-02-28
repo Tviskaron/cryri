@@ -20,6 +20,7 @@ class CloudConfig(BaseModel):
     description: str = None
     processes_per_worker: int = 1
 
+
 class CryConfig(BaseModel):
     container: ContainerConfig = ContainerConfig()
     cloud: CloudConfig = CloudConfig()
