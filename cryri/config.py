@@ -9,6 +9,7 @@ class ContainerConfig(BaseModel):
     work_dir: str = None
     run_from_copy: bool = False
     cry_copy_dir: str = None
+    exclude_from_copy: List[str] = []
 
 
 class CloudConfig(BaseModel):
@@ -18,7 +19,7 @@ class CloudConfig(BaseModel):
     priority: str = "medium"
     description: str = None
     tags: List[str] = []
-
+    processes_per_worker: int = 1
 
 class CryConfig(BaseModel):
     container: ContainerConfig = ContainerConfig()

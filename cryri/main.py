@@ -27,6 +27,7 @@ def submit_run(cfg: CryConfig) -> str:
             base_image=cfg.container.image,
             script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
             instance_type=cfg.cloud.instance_type,
+            processes_per_worker=cfg.cloud.processes_per_worker,
             n_workers=cfg.cloud.n_workers,
             region=cfg.cloud.region,
             type='binary',

@@ -36,5 +36,12 @@ def create_run_copy(cfg: CryConfig) -> Path:
     hash_suffix = hashlib.sha1(datetime.now().strftime(f"{DATETIME_FORMAT}S").encode()).hexdigest()[:HASH_LENGTH]
     run_name = f"run_{now}_{hash_suffix}"
     run_folder = Path(cfg.container.cry_copy_dir) / run_name
-    shutil.copytree(copy_from_folder, run_folder)
+
+    ignore_fun = shutil.ignore_patterns(*cfg.container.exclude_from_copy)
+    shutil.copytree(
+        copy_from_folder,
+        run_folder,
+        ignore=ignore_fun
+    )
+
     return run_folder
