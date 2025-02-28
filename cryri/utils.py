@@ -4,7 +4,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from .config import CryConfig
+from cryri.config import CryConfig
 
 DATETIME_FORMAT = "%Y_%m_%d_%H%M"
 HASH_LENGTH = 6
@@ -20,11 +20,7 @@ def create_job_description(cfg: CryConfig) -> str:
     if job_description is None:
         job_description = str(Path(cfg.container.work_dir).resolve()).replace('/home/jovyan/', '').replace('/', '-')
     if team_name is not None:
-        job_description = f"{team_name}-{job_description}"
-
-    if cfg.cloud.tags:
-        tags_with_prefix = [f"#{tag}" for tag in cfg.cloud.tags]
-        job_description = f"{job_description} {' '.join(tags_with_prefix)}"
+        job_description = f"{job_description} #{team_name}"
 
     return job_description
 

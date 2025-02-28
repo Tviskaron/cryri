@@ -45,10 +45,4 @@ def test_create_job_description_basic(basic_config):
 def test_create_job_description_with_team(basic_config):
     basic_config.container.environment = {"TEAM_NAME": "test-team"}
     description = create_job_description(basic_config)
-    assert description == "test-team--test-dir"
-
-
-def test_create_job_description_with_tags(basic_config):
-    basic_config.cloud.tags = ["tag1", "tag2"]
-    description = create_job_description(basic_config)
-    assert description == "-test-dir #tag1 #tag2"
+    assert description == "-test-dir #test-team"

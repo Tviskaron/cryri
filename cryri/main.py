@@ -4,9 +4,9 @@ from pathlib import Path
 
 import yaml
 
-from .config import CryConfig, CloudConfig
-from .job_manager import JobManager
-from .utils import create_job_description, create_run_copy
+from cryri.config import CryConfig, CloudConfig
+from cryri.job_manager import JobManager
+from cryri.utils import create_job_description, create_run_copy
 
 try:
     import client_lib
@@ -63,18 +63,11 @@ def _handle_config_file(config_file: str) -> None:
     except yaml.YAMLError as e:
         logging.error("Error parsing YAML file: %s", e)
 
+
 def get_instance_types(region):
 
     return client_lib.get_instance_types(regions=region)
 
-
-def _config_from_args(args):
-    cloud_cfg = CloudConfig()
-    if args.region is not None:
-        cloud_cfg.region = args.region
-
-    cfg = CryConfig(cloud=cloud_cfg)
-    return cfg
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

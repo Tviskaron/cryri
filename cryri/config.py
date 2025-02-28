@@ -18,8 +18,8 @@ class CloudConfig(BaseModel):
     n_workers: int = 1
     priority: str = "medium"
     description: str = None
-    tags: List[str] = []
     processes_per_worker: int = 1
+
 
 class CryConfig(BaseModel):
     container: ContainerConfig = ContainerConfig()
