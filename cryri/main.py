@@ -23,9 +23,10 @@ def submit_run(cfg: CryConfig) -> str:
     logging.info("Submitting job with description: %s", job_description)
 
     try:
+        quoted_command = cfg.container.command.replace('"', '\\"')
         job = client_lib.Job(
             base_image=cfg.container.image,
-            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
+            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {quoted_command}"',
             instance_type=cfg.cloud.instance_type,
             processes_per_worker=cfg.cloud.processes_per_worker,
             n_workers=cfg.cloud.n_workers,
@@ -39,15 +40,6 @@ def submit_run(cfg: CryConfig) -> str:
     except Exception as e:
         logging.error("Failed to submit job: %s", e)
         raise
-
-
-def _config_from_args(args):
-    cloud_cfg = CloudConfig()
-    if args.region is not None:
-        cloud_cfg.region = args.region
-
-    cfg = CryConfig(cloud=cloud_cfg)
-    return cfg
 
 
 def _handle_config_file(config_file: str) -> None:
@@ -65,8 +57,16 @@ def _handle_config_file(config_file: str) -> None:
 
 
 def get_instance_types(region):
-
     return client_lib.get_instance_types(regions=region)
+
+
+def _config_from_args(args):
+    cloud_cfg = CloudConfig()
+    if args.region is not None:
+        cloud_cfg.region = args.region
+
+    cfg = CryConfig(cloud=cloud_cfg)
+    return cfg
 
 
 def main():
