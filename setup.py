@@ -31,7 +31,7 @@ def find_version(*file_paths):
 
 
 setup(
-    name='cryri',
+    name="cryri",
     author='Alexey Skrynnik',
     license='MIT',
     version=find_version("cryri", "__init__.py"),
@@ -39,16 +39,20 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/Tviskaron/cryri',
-    install_requires=[
-        "pyyaml",
-        "pydantic",
-        "argparse",
-        "rich"
-    ],
     package_data={'cryri': ['run.yaml']},
     include_package_data=True,
     package_dir={'': './'},
     packages=find_packages(where='./', include='cryri*'),
     entry_points={"console_scripts": ["cryri=cryri.main:main"], },
     python_requires='>=3.6',
+    install_requires=[
+        "pydantic",
+        "rich",
+        "pyyaml",
+        "argparse",
+    ],
+    extras_require={
+        'test': ['pytest'],
+        'lint': ['flake8', 'pylint'],
+    },
 )
