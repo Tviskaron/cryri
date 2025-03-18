@@ -115,7 +115,18 @@ def main():
         help="Provide cloud region."
     )
 
+    parser.add_argument('--version', action='store_true', help="Show version of cryri")
+
     args = parser.parse_args()
+    if args.version:
+        import importlib
+        try:
+            version = importlib.metadata.version("cryri")
+            print(version)
+        except importlib.metadata.PackageNotFoundError:
+            print("Cryri package not found.")
+        return
+
     cfg = _config_from_args(args)
 
     job_manager = JobManager(cfg.cloud.region)
