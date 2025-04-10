@@ -1,10 +1,11 @@
-import os
 import hashlib
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Union, List, Dict, Tuple
 
-from cryri.config import CryConfig
+from cryri.config import CryConfig, ContainerConfig
 
 DATETIME_FORMAT = "%Y_%m_%d_%H%M"
 HASH_LENGTH = 6
@@ -48,17 +49,39 @@ def create_run_copy(cfg: CryConfig) -> Path:
     return run_folder
 
 
-def expand_environment_vars_and_user(environment: dict):
-    if environment is None:
+def expand_config_vars_and_user(config: ContainerConfig):
+    config.environment = expand_vars_and_user(config.environment)
+    config.work_dir = expand_vars_and_user(config.work_dir)
+    config.cry_copy_dir = expand_vars_and_user(config.cry_copy_dir)
+    config.exclude_from_copy = expand_vars_and_user(config.exclude_from_copy)
+
+
+def expand_vars_and_user(
+        s: Union[None, str, Tuple[Any], List[Any], Dict[Any, Any]]
+) -> Union[None, str, Tuple[Any], List[Any], Dict[Any, Any]]:
+    """
+    Universal function that returns a copy of an input with values expanded,
+    if they are str and contain known expandable parts (`~` home or `$XXX` env var)
+    """
+
+    if s is None:
         return None
 
-    from os.path import expandvars, expanduser
+    if isinstance(s, tuple):
+        return tuple(expand_vars_and_user(x) for x in s)
 
+    if isinstance(s, list):
+        return [expand_vars_and_user(x) for x in s]
+
+    if isinstance(s, dict):
+        return {k: expand_vars_and_user(v) for k, v in s.items()}
+
+    if not isinstance(s, str):
+        return s
+
+    from os.path import expandvars, expanduser
     # NB: expand vars then user, since vars could be expanded into a path
     #   that requires user expansion
     # NB2: expect only known/existing environment vars to be expanded!
     #   others will be left as-is
-    return {
-        k: expanduser(expandvars(v))
-        for k, v in environment.items()
-    }
+    return expanduser(expandvars(s))
