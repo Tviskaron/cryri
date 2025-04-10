@@ -21,7 +21,9 @@ def submit_run(cfg: CryConfig) -> str:
     """Submit a job run with the given configuration."""
     cfg.container.environment = expand_environment_vars_and_user(cfg.container.environment)
 
-    if cfg.container.run_from_copy and cfg.container.cry_copy_dir:
+    if cfg.container.run_from_copy:
+        assert cfg.container.cry_copy_dir, \
+            f'Copy dir is not set: {cfg.container.cry_copy_dir}'
         cfg.container.work_dir = create_run_copy(cfg)
 
     job_description = create_job_description(cfg)
