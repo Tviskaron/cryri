@@ -125,12 +125,10 @@ def _check_version():
     try:
         version = importlib.metadata.version("cryri")
         print(version)
-        return True
     except importlib.metadata.PackageNotFoundError:
         print("Cryri package not found.")
-        return True
-    return False
 
+    return
 
 def _execute_command(args, job_manager):
     """Execute the appropriate command based on the provided arguments."""
@@ -156,7 +154,8 @@ def main():
     parser = _setup_arg_parser()
     args = parser.parse_args()
 
-    if args.version and _check_version():
+    if args.version:
+        _check_version()
         return
 
     cfg = _config_from_args(args)
