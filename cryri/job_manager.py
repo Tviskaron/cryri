@@ -1,6 +1,6 @@
 import io
 import logging
-from typing import Optional
+from typing import Optional, List
 from contextlib import redirect_stdout
 from rich.console import Console
 
@@ -15,7 +15,7 @@ class JobManager:
         self.region = region
         self.console = Console()
 
-    def get_jobs(self) -> list[str]:
+    def get_jobs(self) -> List[str]:
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             client_lib.jobs(region=self.region)
