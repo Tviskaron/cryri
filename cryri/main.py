@@ -1,3 +1,4 @@
+import importlib
 import logging
 import argparse
 from pathlib import Path
@@ -121,7 +122,6 @@ def _setup_arg_parser():
 
 def _check_version():
     """Check and print the version of cryri."""
-    import importlib
     try:
         version = importlib.metadata.version("cryri")
         print(version)
