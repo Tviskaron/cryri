@@ -6,7 +6,9 @@ import yaml
 
 from cryri.config import CryConfig, CloudConfig
 from cryri.job_manager import JobManager
-from cryri.utils import create_job_description, create_run_copy
+from cryri.utils import (
+    create_job_description, create_run_copy, expand_environment_vars_and_user
+)
 
 try:
     import client_lib
@@ -16,6 +18,8 @@ except ImportError:
 
 def submit_run(cfg: CryConfig) -> str:
     """Submit a job run with the given configuration."""
+    cfg.container.environment = expand_environment_vars_and_user(cfg.container.environment)
+
     if cfg.container.run_from_copy and cfg.container.cry_copy_dir:
         cfg.container.work_dir = create_run_copy(cfg)
 

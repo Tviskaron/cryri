@@ -1,12 +1,12 @@
 import io
 import logging
-from typing import List, Optional
+from typing import Optional, List
 from contextlib import redirect_stdout
 from rich.console import Console
 
 try:
     import client_lib
-except ImportError:
+except ModuleNotFoundError:
     logging.warning("client_lib not found. Some functionality may be limited.")
 
 
