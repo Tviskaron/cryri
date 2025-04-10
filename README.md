@@ -86,6 +86,9 @@ cloud:
      run_from_copy: True
      ```
 
+5. **Environment variables propagation**
+   - You can pass (=propagate) environment variables directly, e.g. `"WANDB_API_KEY": "$WANDB_API_KEY"`. It will be expanded using your (=caller) current set of the environment variables before passing to the Job creation service.
+   - You can also pass paths relative to your HOME directory, e.g. `~/path/to/somewhere`. It will also be expanded using your `$HOME` variable.
 
 ### View Logs
 
