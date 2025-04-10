@@ -1,12 +1,12 @@
 import io
 import logging
-from typing import List, Optional
+from typing import Optional
 from contextlib import redirect_stdout
 from rich.console import Console
 
 try:
     import client_lib
-except ImportError:
+except ModuleNotFoundError:
     logging.warning("client_lib not found. Some functionality may be limited.")
 
 
@@ -15,7 +15,7 @@ class JobManager:
         self.region = region
         self.console = Console()
 
-    def get_jobs(self) -> List[str]:
+    def get_jobs(self) -> list[str]:
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             client_lib.jobs(region=self.region)

@@ -1,15 +1,14 @@
-from typing import Dict, List
 from pydantic import BaseModel
 
 
 class ContainerConfig(BaseModel):
     image: str = None
     command: str = None
-    environment: Dict = None
+    environment: dict = None
     work_dir: str = None
     run_from_copy: bool = False
     cry_copy_dir: str = None
-    exclude_from_copy: List[str] = []
+    exclude_from_copy: list[str] = []
 
 
 class CloudConfig(BaseModel):
