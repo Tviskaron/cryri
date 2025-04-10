@@ -25,4 +25,4 @@ def func2():
     pass
 ```
 - NEVER leave trailing whitespaces at the end of line
-- Alwas leave a new line at the end of file
+- Always leave a new line at the end of file
