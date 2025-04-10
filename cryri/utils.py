@@ -41,3 +41,18 @@ def create_run_copy(cfg: CryConfig) -> Path:
     )
 
     return run_folder
+
+def expand_environment_vars_and_user(environment: dict):
+    if environment is None:
+        return None
+
+    from os.path import expandvars, expanduser
+
+    # NB: expand vars then user, since vars could be expanded into a path
+    #   that requires user expansion
+    # NB2: expect only known/existing environment vars to be expanded!
+    #   others will be left as-is
+    return {
+        k: expanduser(expandvars(v))
+        for k, v in environment.items()
+    }
