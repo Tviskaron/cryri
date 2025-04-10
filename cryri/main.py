@@ -8,7 +8,7 @@ import yaml
 from cryri.config import CryConfig, CloudConfig
 from cryri.job_manager import JobManager
 from cryri.utils import (
-    create_job_description, create_run_copy, expand_config_vars_and_user
+    create_job_description, create_run_copy, expand_config_vars_and_user, sanitize_config_paths
 )
 
 try:
@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 def submit_run(cfg: CryConfig) -> str:
     """Submit a job run with the given configuration."""
     expand_config_vars_and_user(cfg.container)
+    sanitize_config_paths(cfg.container)
 
     if cfg.container.run_from_copy:
         assert cfg.container.cry_copy_dir, \

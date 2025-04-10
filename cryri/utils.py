@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Union, List, Dict, Tuple
+from typing import Any, Union, List, Dict, Tuple, Optional
 
 from cryri.config import CryConfig, ContainerConfig
 
@@ -49,11 +49,16 @@ def create_run_copy(cfg: CryConfig) -> Path:
     return run_folder
 
 
-def expand_config_vars_and_user(config: ContainerConfig):
-    config.environment = expand_vars_and_user(config.environment)
-    config.work_dir = expand_vars_and_user(config.work_dir)
-    config.cry_copy_dir = expand_vars_and_user(config.cry_copy_dir)
-    config.exclude_from_copy = expand_vars_and_user(config.exclude_from_copy)
+def expand_config_vars_and_user(cfg: ContainerConfig):
+    cfg.environment = expand_vars_and_user(cfg.environment)
+    cfg.work_dir = expand_vars_and_user(cfg.work_dir)
+    cfg.cry_copy_dir = expand_vars_and_user(cfg.cry_copy_dir)
+    cfg.exclude_from_copy = expand_vars_and_user(cfg.exclude_from_copy)
+
+
+def sanitize_config_paths(cfg: ContainerConfig):
+    cfg.work_dir = sanitize_dir_path(cfg.work_dir)
+    cfg.cry_copy_dir = sanitize_dir_path(cfg.cry_copy_dir)
 
 
 def expand_vars_and_user(
@@ -68,6 +73,7 @@ def expand_vars_and_user(
         return None
 
     if isinstance(s, tuple):
+        # noinspection PyTypeChecker
         return tuple(expand_vars_and_user(x) for x in s)
 
     if isinstance(s, list):
@@ -85,3 +91,18 @@ def expand_vars_and_user(
     # NB2: expect only known/existing environment vars to be expanded!
     #   others will be left as-is
     return expanduser(expandvars(s))
+
+
+def sanitize_dir_path(p: Optional[str]) -> Optional[str]:
+    if p is None:
+        return None
+
+    # NB: it expects already expanded path
+    # NB2: it expects existing path (= all parts along the path are existing)
+
+    # resolve to make an absolute normalized path
+    p = Path(p).resolve()
+    if not p.is_dir():
+        p = p.parent
+
+    return str(p)
