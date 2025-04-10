@@ -1,3 +1,4 @@
+import importlib
 import logging
 import argparse
 from pathlib import Path
@@ -27,9 +28,10 @@ def submit_run(cfg: CryConfig) -> str:
     logging.info("Submitting job with description: %s", job_description)
 
     try:
+        quoted_command = cfg.container.command.replace('"', '\\"')
         job = client_lib.Job(
             base_image=cfg.container.image,
-            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {cfg.container.command}"',
+            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {quoted_command}"',
             instance_type=cfg.cloud.instance_type,
             processes_per_worker=cfg.cloud.processes_per_worker,
             n_workers=cfg.cloud.n_workers,
@@ -69,13 +71,11 @@ def _handle_config_file(config_file: str) -> None:
 
 
 def get_instance_types(region):
-
     return client_lib.get_instance_types(regions=region)
 
 
-def main():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+def _setup_arg_parser():
+    """Set up and return the argument parser."""
     parser = argparse.ArgumentParser(description="Script for managing runs and logs.")
 
     # Default mode: Run configuration from a YAML file
@@ -121,35 +121,51 @@ def main():
 
     parser.add_argument('--version', action='store_true', help="Show version of cryri")
 
+    return parser
+
+
+def _check_version():
+    """Check and print the version of cryri."""
+    try:
+        version = importlib.metadata.version("cryri")
+        print(version)
+    except importlib.metadata.PackageNotFoundError:
+        print("Cryri package not found.")
+
+
+def _execute_command(args, job_manager):
+    """Execute the appropriate command based on the provided arguments."""
+    if args.logs:
+        job_manager.show_logs(args.logs)
+    elif args.instance_types:
+        instance_types_table = job_manager.get_instance_types()
+        job_manager.console.print(instance_types_table)
+    elif args.jobs:
+        for job in job_manager.get_jobs():
+            print(job)
+    elif args.kill:
+        job_manager.kill_job(args.kill)
+    elif args.config_file:
+        _handle_config_file(args.config_file)
+    else:
+        logging.warning("No valid arguments provided. Use --help for more information.")
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    parser = _setup_arg_parser()
     args = parser.parse_args()
+
     if args.version:
-        import importlib
-        try:
-            version = importlib.metadata.version("cryri")
-            print(version)
-        except importlib.metadata.PackageNotFoundError:
-            print("Cryri package not found.")
+        _check_version()
         return
 
     cfg = _config_from_args(args)
-
     job_manager = JobManager(cfg.cloud.region)
 
     try:
-        if args.logs:
-            job_manager.show_logs(args.logs)
-        elif args.instance_types:
-            instance_types_table = job_manager.get_instance_types()
-            job_manager.console.print(instance_types_table)
-        elif args.jobs:
-            for job in job_manager.get_jobs():
-                print(job)
-        elif args.kill:
-            job_manager.kill_job(args.kill)
-        elif args.config_file:
-            _handle_config_file(args.config_file)
-        else:
-            logging.warning("No valid arguments provided. Use --help for more information.")
+        _execute_command(args, job_manager)
     except Exception as e:
         logging.error("An error occurred: %s", e)
         raise

@@ -1,4 +1,4 @@
-name: Python Linting
+name: flake8 Linting
 
 on:
   push:
@@ -25,7 +25,3 @@ jobs:
     - name: Run Flake8
       run: |
         PYTHONPATH=. flake8 cryri/ tests/
-
-    - name: Run Pylint
-      run: |
-        PYTHONPATH=. pylint cryri/ tests/
