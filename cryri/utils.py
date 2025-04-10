@@ -32,7 +32,7 @@ def create_run_copy(cfg: CryConfig) -> Path:
     now = datetime.now()
     now_str = now.strftime(DATETIME_FORMAT)
     hash_suffix = hashlib.sha1(
-        now.strftime(f"{DATETIME_FORMAT}S").encode()
+        now.strftime(f"{DATETIME_FORMAT}%S").encode()
     ).hexdigest()[:HASH_LENGTH]
 
     run_name = f"run_{now_str}_{hash_suffix}"
