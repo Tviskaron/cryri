@@ -128,7 +128,6 @@ def _check_version():
     except importlib.metadata.PackageNotFoundError:
         print("Cryri package not found.")
 
-    return
 
 def _execute_command(args, job_manager):
     """Execute the appropriate command based on the provided arguments."""
