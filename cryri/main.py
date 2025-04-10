@@ -13,7 +13,7 @@ from cryri.utils import (
 
 try:
     import client_lib
-except ImportError:
+except ModuleNotFoundError:
     logging.warning("client_lib not found. Some functionality may be limited.")
 
 
