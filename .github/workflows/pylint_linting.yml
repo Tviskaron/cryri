@@ -1,4 +1,4 @@
-name: flake8 Linting
+name: Pylint Linting
 
 on:
   push:
