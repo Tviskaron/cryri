@@ -28,9 +28,14 @@ def create_job_description(cfg: CryConfig) -> str:
 def create_run_copy(cfg: CryConfig) -> Path:
     """Create a copy of the work directory for the run."""
     copy_from_folder = Path(cfg.container.work_dir).parent.resolve()
-    now = datetime.now().strftime(DATETIME_FORMAT)
-    hash_suffix = hashlib.sha1(datetime.now().strftime(f"{DATETIME_FORMAT}S").encode()).hexdigest()[:HASH_LENGTH]
-    run_name = f"run_{now}_{hash_suffix}"
+
+    now = datetime.now()
+    now_str = now.strftime(DATETIME_FORMAT)
+    hash_suffix = hashlib.sha1(
+        now.strftime(f"{DATETIME_FORMAT}S").encode()
+    ).hexdigest()[:HASH_LENGTH]
+
+    run_name = f"run_{now_str}_{hash_suffix}"
     run_folder = Path(cfg.container.cry_copy_dir) / run_name
 
     ignore_fun = shutil.ignore_patterns(*cfg.container.exclude_from_copy)
