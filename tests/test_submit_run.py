@@ -24,7 +24,7 @@ from cryri.main import submit_run  # noqa: E402
 TEST_CONFIG_YAML = """
 container:
   image: "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py310:0.0.36"
-  command: /workspace-SR004.nfs2/d.tarasov/envs/audio-sae/bin/python -c 'print( "double quotes" )'
+  command: python -c 'print("double quotes")'
   work_dir: '.'
 
 cloud:
