@@ -42,6 +42,15 @@ def submit_run(cfg: CryConfig) -> str:
         raise
 
 
+def _config_from_args(args):
+    cloud_cfg = CloudConfig()
+    if args.region is not None:
+        cloud_cfg.region = args.region
+
+    cfg = CryConfig(cloud=cloud_cfg)
+    return cfg
+
+
 def _handle_config_file(config_file: str) -> None:
     """Handle the configuration file processing and job submission."""
     logging.info("Running configuration from: %s", config_file)
@@ -58,15 +67,6 @@ def _handle_config_file(config_file: str) -> None:
 
 def get_instance_types(region):
     return client_lib.get_instance_types(regions=region)
-
-
-def _config_from_args(args):
-    cloud_cfg = CloudConfig()
-    if args.region is not None:
-        cloud_cfg.region = args.region
-
-    cfg = CryConfig(cloud=cloud_cfg)
-    return cfg
 
 
 def main():
@@ -115,7 +115,18 @@ def main():
         help="Provide cloud region."
     )
 
+    parser.add_argument('--version', action='store_true', help="Show version of cryri")
+
     args = parser.parse_args()
+    if args.version:
+        import importlib
+        try:
+            version = importlib.metadata.version("cryri")
+            print(version)
+        except importlib.metadata.PackageNotFoundError:
+            print("Cryri package not found.")
+        return
+
     cfg = _config_from_args(args)
 
     job_manager = JobManager(cfg.cloud.region)
