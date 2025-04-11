@@ -12,24 +12,29 @@ HASH_LENGTH = 6
 
 
 def create_job_description(cfg: CryConfig) -> str:
+    job_description = cfg.cloud.description
+    if job_description is None:
+        job_description = cfg.container.work_dir
+        for prefix in ['/home/jovyan']:
+            if job_description.startswith(prefix):
+                job_description = job_description[len(prefix):]
+                break
+        job_description = job_description.replace('/', '-')
+
     team_name = None
     if cfg.container.environment is not None:
         team_name = cfg.container.environment.get("TEAM_NAME", None)
     if team_name is None:
         team_name = os.environ.get('TEAM_NAME', None)
-    job_description = cfg.cloud.description
-    if job_description is None:
-        job_description = str(Path(cfg.container.work_dir).resolve()).replace('/home/jovyan/', '').replace('/', '-')
+
     if team_name is not None:
         job_description = f"{job_description} #{team_name}"
 
     return job_description
 
 
-def create_run_copy(cfg: CryConfig) -> Path:
+def create_run_copy(cfg: ContainerConfig) -> str:
     """Create a copy of the work directory for the run."""
-    copy_from_folder = Path(cfg.container.work_dir).parent.resolve()
-
     now = datetime.now()
     now_str = now.strftime(DATETIME_FORMAT)
     hash_suffix = hashlib.sha1(
@@ -37,16 +42,17 @@ def create_run_copy(cfg: CryConfig) -> Path:
     ).hexdigest()[:HASH_LENGTH]
 
     run_name = f"run_{now_str}_{hash_suffix}"
-    run_folder = Path(cfg.container.cry_copy_dir) / run_name
+    run_copy_dir = Path(cfg.cry_copy_dir) / run_name
+    run_copy_dir = str(run_copy_dir.resolve())
 
-    ignore_fun = shutil.ignore_patterns(*cfg.container.exclude_from_copy)
+    ignore_func = shutil.ignore_patterns(*cfg.exclude_from_copy)
     shutil.copytree(
-        copy_from_folder,
-        run_folder,
-        ignore=ignore_fun
+        src=cfg.work_dir,
+        dst=run_copy_dir,
+        ignore=ignore_func
     )
 
-    return run_folder
+    return run_copy_dir
 
 
 def expand_config_vars_and_user(cfg: ContainerConfig):
