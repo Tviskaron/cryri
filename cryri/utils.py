@@ -47,6 +47,7 @@ def create_run_copy(cfg: CryConfig) -> Path:
 
     return run_folder
 
+
 def expand_environment_vars_and_user(environment: dict):
     if environment is None:
         return None
