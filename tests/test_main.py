@@ -150,8 +150,8 @@ def test_expand_vars_and_user(expandable_struct, caplog):
     # Take last record, use .message for the actual string content
     actual_msg = caplog.records[-1].message
     expected_msg = (
-        'After env vars expansion, the value still contains a `$`:\n'
-        '"$NON_EXISTING_VAR/$100 bucks"\n'
+        'After env vars expansion, the value still contains a `$`: '
+        '"$NON_EXISTING_VAR/$100 bucks".\n'
         'Note: This might be a false alarm — just ensuring a potential silent issue '
         'does not go unnoticed.'
     )

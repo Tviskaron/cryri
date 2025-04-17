@@ -105,8 +105,7 @@ def expand_vars_and_user(
     # are expected to be present while they are not (e.g. rc-file sourcing failed)
     if "$" in s:
         logging.warning(
-            'After env vars expansion, the value still contains a `$`:\n'
-            '"%s"\n'
+            'After env vars expansion, the value still contains a `$`: "%s".\n'
             'Note: This might be a false alarm — just ensuring a potential silent issue '
             'does not go unnoticed.',
             s
