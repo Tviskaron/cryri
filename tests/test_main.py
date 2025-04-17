@@ -54,6 +54,7 @@ def test_create_job_description_with_team(basic_config):
     description = create_job_description(basic_config)
     assert description == "-test-dir #test-team"
 
+
 def test_expand_vars_user(basic_config):
     from os import environ
     environ['EXISTING_VAR'] = '!SPECIAL_VALUE!'
