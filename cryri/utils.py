@@ -1,7 +1,9 @@
 import hashlib
+import logging
 import os
 import shutil
 from datetime import datetime
+from os.path import expanduser, expandvars
 from pathlib import Path
 from typing import Any, Union, List, Dict, Tuple, Optional
 
@@ -41,9 +43,9 @@ def create_run_copy(cfg: ContainerConfig) -> str:
         now.strftime(f"{DATETIME_FORMAT}%S").encode()
     ).hexdigest()[:HASH_LENGTH]
 
-    run_name = f"run_{now_str}_{hash_suffix}"
-    run_copy_dir = Path(cfg.cry_copy_dir) / run_name
-    run_copy_dir = str(run_copy_dir.resolve())
+    run_copy_dir = str(
+        Path(cfg.cry_copy_dir) / f"run_{now_str}_{hash_suffix}"
+    )
 
     ignore_func = shutil.ignore_patterns(*cfg.exclude_from_copy)
     shutil.copytree(
@@ -71,7 +73,10 @@ def expand_vars_and_user(
 ) -> Union[None, str, Tuple[Any], List[Any], Dict[Any, Any]]:
     """
     Universal function that returns a copy of an input with values expanded,
-    if they are str and contain known expandable parts (`~` home or `$XXX` env var)
+    if they are str and contain known expandable parts (`~` home or `$XXX` env var).
+
+    Original object is returned iff it is not a subject for expansion. So, it's better
+    read as "this is not an in-place/mutating operation!"
     """
 
     if s is None:
@@ -90,12 +95,24 @@ def expand_vars_and_user(
     if not isinstance(s, str):
         return s
 
-    from os.path import expandvars, expanduser
     # NB: expand vars then user, since vars could be expanded into a path
     #   that requires user expansion
-    # NB2: expect only known/existing environment vars to be expanded!
+    # NB: expect only known/existing environment vars to be expanded!
     #   others will be left as-is
-    return expanduser(expandvars(s))
+    s = expanduser(expandvars(s))
+
+    # notify user if any $'s in the string to catch cases when env vars
+    # are expected to be present while they are not (e.g. rc-file sourcing failed)
+    if "$" in s:
+        logging.warning(
+            'After env vars expansion, the value still contains a `$`:\n'
+            '"%s"\n'
+            'Note: This might be a false alarm — just ensuring a potential silent issue '
+            'does not go unnoticed.',
+            s
+        )
+
+    return s
 
 
 def sanitize_dir_path(p: Optional[str]) -> Optional[str]:
@@ -103,10 +120,12 @@ def sanitize_dir_path(p: Optional[str]) -> Optional[str]:
         return None
 
     # NB: it expects already expanded path
-    # NB2: it expects existing path (= all parts along the path are existing)
+    # NB: it expects an existing path (= all parts along the path are existing)
 
-    # resolve to make an absolute normalized path
+    # resolve path => absolute normalized path
     p = Path(p).resolve()
+
+    # drop non-dir last part => dir path
     if not p.is_dir():
         p = p.parent
 

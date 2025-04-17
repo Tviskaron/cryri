@@ -1,4 +1,5 @@
 # pylint: disable=redefined-outer-name
+from os import environ
 
 import pytest
 
@@ -87,9 +88,8 @@ def test_create_job_description_with_team(basic_config):
     assert description == "-test-dir #test-team"
 
 
-def test_expand_vars_and_user(expandable_struct):
+def test_expand_vars_and_user(expandable_struct, caplog):
     # ====> Preparation
-    from os import environ
     environ['EXISTING_VAR'] = '!SPECIAL_VALUE!'
 
     # sets both UNIX and WINDOWS user home vars
@@ -98,9 +98,12 @@ def test_expand_vars_and_user(expandable_struct):
     # <====
 
     _expandable_struct = expand_vars_and_user(expandable_struct)
+
+    # Check #1: a copy is returned (since it is subject for expansion)
     assert _expandable_struct is not expandable_struct
     expandable_struct = _expandable_struct
 
+    # Check #2: correct expansion
     assert expandable_struct == {
         1: 2,
         2: "!SPECIAL_VALUE!",
@@ -134,4 +137,23 @@ def test_expand_vars_and_user(expandable_struct):
         ),
     }
 
+    # Check #3: gracefully support None input
     assert None is expand_vars_and_user(None)
+
+    # Check #4: warns user if any "$" signs in a resulting strings
+    with caplog.at_level("WARNING"):
+        _ = expand_vars_and_user("$NON_EXISTING_VAR/$100 bucks")
+
+    # There should be any warnings (from previous calls and the last one)
+    assert caplog.records
+
+    # Take last record, use .message for the actual string content
+    actual_msg = caplog.records[-1].message
+    expected_msg = (
+        'After env vars expansion, the value still contains a `$`:\n'
+        '"$NON_EXISTING_VAR/$100 bucks"\n'
+        'Note: This might be a false alarm — just ensuring a potential silent issue '
+        'does not go unnoticed.'
+    )
+
+    assert actual_msg == expected_msg
