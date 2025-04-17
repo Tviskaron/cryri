@@ -59,7 +59,6 @@ def expand_config_vars_and_user(cfg: ContainerConfig):
     cfg.environment = expand_vars_and_user(cfg.environment)
     cfg.work_dir = expand_vars_and_user(cfg.work_dir)
     cfg.cry_copy_dir = expand_vars_and_user(cfg.cry_copy_dir)
-    cfg.exclude_from_copy = expand_vars_and_user(cfg.exclude_from_copy)
 
 
 def sanitize_config_paths(cfg: ContainerConfig):
