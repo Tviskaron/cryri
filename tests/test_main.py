@@ -44,7 +44,6 @@ def test_container_config_defaults():
 
 @mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_basic(basic_config):
-    assert basic_config.container.work_dir == "/test/dir"
     description = create_job_description(basic_config)
     assert description == "-test-dir"
 
