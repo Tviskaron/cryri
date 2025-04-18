@@ -1,16 +1,17 @@
 # pylint: disable=redefined-outer-name
-from os import environ
 
 import pytest
 
 from cryri.config import CryConfig, ContainerConfig, CloudConfig
 from cryri.job_manager import JobManager
 from cryri.utils import (
-    create_job_description, expand_vars_and_user
+    create_job_description
 )
+from tests.utils.mocks import mock_path_resolution, make_is_dir_mock, mock_env_vars
 
 
 @pytest.fixture
+@mock_path_resolution(force_is_dir=make_is_dir_mock())
 def basic_config():
     return CryConfig(
         container=ContainerConfig(
@@ -24,42 +25,6 @@ def basic_config():
             priority="medium"
         )
     )
-
-
-@pytest.fixture
-def expandable_struct():
-    return {
-        1: 2,
-        2: "$EXISTING_VAR",
-        331: None,
-        "TEST_VAR": "no expansion",
-        "TEST_VAR2": "$EXISTING_VAR",
-        "TEST_VAR3": "~/prefix/$EXISTING_VAR/suffix",
-        "TEST_VAR4": "~/prefix/$NON_EXISTING_VAR/suffix",
-        "TEST_VAR5": "$100 bucks",
-        "sub_dict": {
-            "TEST_VAR": "no expansion",
-            "TEST_VAR2": "$EXISTING_VAR",
-            "TEST_VAR3": "~/prefix/$EXISTING_VAR/suffix",
-            "TEST_VAR4": "~/prefix/$NON_EXISTING_VAR/suffix",
-        },
-        "sub_list": [
-            None,
-            "TEST_VAR",
-            "$EXISTING_VAR",
-            "~/prefix:$EXISTING_VAR/suffix",
-            "~/prefix:$NON_EXISTING_VAR/suffix",
-        ],
-        "sub_tuple": (
-            133,
-            None,
-            "TEST_VAR",
-            "$100 bucks",
-            "$EXISTING_VAR",
-            "~ prefix $EXISTING_VAR suffix",
-            "~prefix $EXISTING_VAR1 suffix",
-        ),
-    }
 
 
 @pytest.fixture
@@ -77,83 +42,44 @@ def test_container_config_defaults():
     assert config.cry_copy_dir is None
 
 
+@mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_basic(basic_config):
+    assert basic_config.container.work_dir == "/test/dir"
     description = create_job_description(basic_config)
     assert description == "-test-dir"
 
 
+@mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_with_team(basic_config):
     basic_config.container.environment = {"TEAM_NAME": "test-team"}
     description = create_job_description(basic_config)
     assert description == "-test-dir #test-team"
 
 
-def test_expand_vars_and_user(expandable_struct, caplog):
-    # ====> Preparation
-    environ['EXISTING_VAR'] = '!SPECIAL_VALUE!'
-
-    # sets both UNIX and WINDOWS user home vars
-    environ['HOME'] = '<SOME_PATH>'
-    environ['USERPROFILE'] = '<SOME_PATH>'
-    # <====
-
-    _expandable_struct = expand_vars_and_user(expandable_struct)
-
-    # Check #1: a copy is returned (since it is subject for expansion)
-    assert _expandable_struct is not expandable_struct
-    expandable_struct = _expandable_struct
-
-    # Check #2: correct expansion
-    assert expandable_struct == {
-        1: 2,
-        2: "!SPECIAL_VALUE!",
-        331: None,
-        "TEST_VAR": "no expansion",
-        "TEST_VAR2": "!SPECIAL_VALUE!",
-        "TEST_VAR3": "<SOME_PATH>/prefix/!SPECIAL_VALUE!/suffix",
-        "TEST_VAR4": "<SOME_PATH>/prefix/$NON_EXISTING_VAR/suffix",
-        "TEST_VAR5": "$100 bucks",
-        "sub_dict": {
-            "TEST_VAR": "no expansion",
-            "TEST_VAR2": "!SPECIAL_VALUE!",
-            "TEST_VAR3": "<SOME_PATH>/prefix/!SPECIAL_VALUE!/suffix",
-            "TEST_VAR4": "<SOME_PATH>/prefix/$NON_EXISTING_VAR/suffix",
+@mock_env_vars(
+    HOME="/mock/fake_user", MY_HOME="~/sub_user",
+    WANDB_API_KEY="8aead3118j2ej28e2jee",
+)
+@mock_path_resolution(cwd="/mock/fake_dir/", force_is_dir=make_is_dir_mock())
+def test_container_config_expand_resolve_fields_validators():
+    config = ContainerConfig(
+        image="test-image:latest",
+        command="python script.py",
+        environment={
+            "HF_HOME": "$HOME/.cache/huggingface",
+            "WANDB_API_KEY": "$WANDB_API_KEY",
+            "WANDB_PROJECT": "LoRa-TinyLlama",
+            "TEAM_NAME": "look/like/path",
         },
-        "sub_list": [
-            None,
-            "TEST_VAR",
-            "!SPECIAL_VALUE!",
-            "<SOME_PATH>/prefix:!SPECIAL_VALUE!/suffix",
-            "<SOME_PATH>/prefix:$NON_EXISTING_VAR/suffix",
-        ],
-        "sub_tuple": (
-            133,
-            None,
-            "TEST_VAR",
-            "$100 bucks",
-            "!SPECIAL_VALUE!",
-            "~ prefix !SPECIAL_VALUE! suffix",
-            "~prefix $EXISTING_VAR1 suffix",
-        ),
-    }
-
-    # Check #3: gracefully support None input
-    assert None is expand_vars_and_user(None)
-
-    # Check #4: warns user if any "$" signs in a resulting strings
-    with caplog.at_level("WARNING"):
-        _ = expand_vars_and_user("$NON_EXISTING_VAR/$100 bucks")
-
-    # There should be any warnings (from previous calls and the last one)
-    assert caplog.records
-
-    # Take last record, use .message for the actual string content
-    actual_msg = caplog.records[-1].message
-    expected_msg = (
-        'After env vars expansion, the value still contains a `$`: '
-        '"$NON_EXISTING_VAR/$100 bucks".\n'
-        'Note: This might be a false alarm — just ensuring a potential silent issue '
-        'does not go unnoticed.'
+        work_dir=".",
+        run_from_copy=True,
+        cry_copy_dir="$MY_HOME/.cryri",
     )
-
-    assert actual_msg == expected_msg
+    assert config.environment == {
+        "HF_HOME": "/mock/fake_user/.cache/huggingface",
+        "WANDB_API_KEY": "8aead3118j2ej28e2jee",
+        "WANDB_PROJECT": "LoRa-TinyLlama",
+        "TEAM_NAME": "look/like/path",
+    }
+    assert config.work_dir == "/mock/fake_dir"
+    assert config.cry_copy_dir == "/mock/fake_user/sub_user/.cryri"
