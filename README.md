@@ -86,9 +86,13 @@ cloud:
      run_from_copy: True
      ```
 
-5. **Environment variables propagation**
-   - You can pass (=propagate) environment variables directly, e.g. `"WANDB_API_KEY": "$WANDB_API_KEY"`. It will be expanded using your (=caller) current set of the environment variables before passing to the Job creation service.
-   - You can also pass paths relative to your HOME directory, e.g. `~/path/to/somewhere`. It will also be expanded using your `$HOME` variable.
+5. **Environment variables expansion**
+   - Several fields — `environment`, `work_dir`, `cry_copy_dir` — support environment variables `$XXX` and user home directory `~` expansion.
+   - With this feature, you can 
+     - pass environment variables directly to the docker container via `environment` field, e.g. `"WANDB_API_KEY": "$WANDB_API_KEY"`; 
+     - or use an env var to specify `cry_copy_dir` location `cry_copy_dir: $PERSONAL_HOME/.cryri`. 
+   - Expansion uses your (=caller) current context.
+   - You can also use paths relative to your HOME directory, e.g. `~/path/to/somewhere`. It will be expanded using your `$HOME` variable.
 
 ### View Logs
 

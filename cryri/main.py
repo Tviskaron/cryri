@@ -1,14 +1,13 @@
+import argparse
 import importlib
 import logging
-import argparse
-from pathlib import Path
 
 import yaml
 
 from cryri.config import CryConfig, CloudConfig
 from cryri.job_manager import JobManager
 from cryri.utils import (
-    create_job_description, create_run_copy, expand_environment_vars_and_user
+    create_job_description, create_run_copy
 )
 
 try:
@@ -19,21 +18,21 @@ except ModuleNotFoundError:
 
 def submit_run(cfg: CryConfig) -> str:
     """Submit a job run with the given configuration."""
-    cfg.container.environment = expand_environment_vars_and_user(cfg.container.environment)
-
     if cfg.container.run_from_copy:
         assert cfg.container.cry_copy_dir, \
             f'Copy dir is not set: {cfg.container.cry_copy_dir}'
-        cfg.container.work_dir = create_run_copy(cfg)
+        cfg.container.work_dir = create_run_copy(cfg.container)
 
     job_description = create_job_description(cfg)
     logging.info("Submitting job with description: %s", job_description)
 
     try:
         quoted_command = cfg.container.command.replace('"', '\\"')
+        run_script = f'bash -c "cd {cfg.container.work_dir} && {quoted_command}"'
+
         job = client_lib.Job(
             base_image=cfg.container.image,
-            script=f'bash -c "cd {str(Path(cfg.container.work_dir).resolve())} && {quoted_command}"',
+            script=run_script,
             instance_type=cfg.cloud.instance_type,
             processes_per_worker=cfg.cloud.processes_per_worker,
             n_workers=cfg.cloud.n_workers,

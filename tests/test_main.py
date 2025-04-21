@@ -1,25 +1,23 @@
 # pylint: disable=redefined-outer-name
 
 import pytest
+
 from cryri.config import CryConfig, ContainerConfig, CloudConfig
 from cryri.job_manager import JobManager
-from cryri.utils import create_job_description, expand_environment_vars_and_user
+from cryri.utils import (
+    create_job_description
+)
+from tests.utils.mocks import mock_path_resolution, make_is_dir_mock, mock_env_vars
 
 
 @pytest.fixture
+@mock_path_resolution(force_is_dir=make_is_dir_mock())
 def basic_config():
     return CryConfig(
         container=ContainerConfig(
             image="test-image:latest",
             command="python script.py",
             work_dir="/test/dir",
-            environment={
-                "TEST_VAR": "no expansion",
-                "TEST_VAR2": "$EXISTING_VAR",
-                "TEST_VAR3": "~/prefix/$EXISTING_VAR/suffix",
-                "TEST_VAR4": "~/prefix/$NON_EXISTING_VAR/suffix",
-                "TEST_VAR5": "$100 bucks",
-            }
         ),
         cloud=CloudConfig(
             region="SR006",
@@ -44,29 +42,43 @@ def test_container_config_defaults():
     assert config.cry_copy_dir is None
 
 
+@mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_basic(basic_config):
     description = create_job_description(basic_config)
     assert description == "-test-dir"
 
 
+@mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_with_team(basic_config):
     basic_config.container.environment = {"TEAM_NAME": "test-team"}
     description = create_job_description(basic_config)
     assert description == "-test-dir #test-team"
 
 
-def test_expand_vars_user(basic_config):
-    from os import environ
-    environ['EXISTING_VAR'] = '!SPECIAL_VALUE!'
-
-    # sets both UNIX and WINDOWS user home vars
-    environ['HOME'] = '<SOME_PATH>'
-    environ['USERPROFILE'] = '<SOME_PATH>'
-
-    env = basic_config.container.environment
-    env = expand_environment_vars_and_user(env)
-    assert env['TEST_VAR'] == 'no expansion'
-    assert env['TEST_VAR2'] == '!SPECIAL_VALUE!'
-    assert env['TEST_VAR3'] == '<SOME_PATH>/prefix/!SPECIAL_VALUE!/suffix'
-    assert env['TEST_VAR4'] == '<SOME_PATH>/prefix/$NON_EXISTING_VAR/suffix'
-    assert env['TEST_VAR5'] == '$100 bucks'
+@mock_env_vars(
+    HOME="/mock/fake_user", MY_HOME="~/sub_user",
+    WANDB_API_KEY="8aead3118j2ej28e2jee",
+)
+@mock_path_resolution(cwd="/mock/fake_dir/", force_is_dir=make_is_dir_mock())
+def test_container_config_expand_resolve_fields_validators():
+    config = ContainerConfig(
+        image="test-image:latest",
+        command="python script.py",
+        environment={
+            "HF_HOME": "$HOME/.cache/huggingface",
+            "WANDB_API_KEY": "$WANDB_API_KEY",
+            "WANDB_PROJECT": "LoRa-TinyLlama",
+            "TEAM_NAME": "look/like/path",
+        },
+        work_dir=".",
+        run_from_copy=True,
+        cry_copy_dir="$MY_HOME/.cryri",
+    )
+    assert config.environment == {
+        "HF_HOME": "/mock/fake_user/.cache/huggingface",
+        "WANDB_API_KEY": "8aead3118j2ej28e2jee",
+        "WANDB_PROJECT": "LoRa-TinyLlama",
+        "TEAM_NAME": "look/like/path",
+    }
+    assert config.work_dir == "/mock/fake_dir"
+    assert config.cry_copy_dir == "/mock/fake_user/sub_user/.cryri"
