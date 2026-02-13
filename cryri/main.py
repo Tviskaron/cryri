@@ -39,7 +39,6 @@ def submit_run(cfg: CryConfig) -> str:
             region=cfg.cloud.region,
             type='binary',
             env_variables=cfg.container.environment,
-            priority_class=cfg.cloud.priority,
             job_desc=job_description,
         )
         return job.submit()

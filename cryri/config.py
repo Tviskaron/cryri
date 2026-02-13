@@ -31,7 +31,6 @@ class CloudConfig(BaseModel):
     region: str = "SR006"
     instance_type: str = None
     n_workers: int = 1
-    priority: str = "medium"
     description: str = None
     processes_per_worker: int = 1
 

@@ -22,7 +22,6 @@ def basic_config():
         cloud=CloudConfig(
             region="SR006",
             instance_type="cpu.small",
-            priority="medium"
         )
     )
 
