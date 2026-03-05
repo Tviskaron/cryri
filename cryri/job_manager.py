@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from cryri import api
 from cryri.api import ApiError
 from cryri.config import CryConfig
-from cryri.utils import create_run_copy, create_job_description
+from cryri.utils import create_run_copy, create_job_description, _extract_user_home
 
 
 class JobNotFoundError(Exception):
@@ -115,15 +115,20 @@ class JobManager:
             cfg.container.work_dir = create_run_copy(cfg.container)
 
         if cfg.container.uv.enabled and cfg.container.run_from_copy:
-            if ".cache/" not in cfg.container.exclude_from_copy:
-                cfg.container.exclude_from_copy.append(".cache/")
+            if cfg.container.uv.prefetch_cache:
+                # Keep cache (prefetched deps), exclude venv (not portable)
+                if ".venv/" not in cfg.container.exclude_from_copy:
+                    cfg.container.exclude_from_copy.append(".venv/")
+            else:
+                if ".cache/" not in cfg.container.exclude_from_copy:
+                    cfg.container.exclude_from_copy.append(".cache/")
 
         job_description = create_job_description(cfg)
 
         quoted_dir = shlex.quote(cfg.container.work_dir)
 
         if cfg.container.uv.enabled:
-            cache_dir = cfg.container.uv.cache_dir
+            cache_dir = cfg.container.uv.cache_dir or f"{_extract_user_home(cfg.container.work_dir)}/.cache/uv"
             quiet = "" if cfg.container.uv.verbose else " -q"
             user_cmd = cfg.container.command
             if user_cmd.startswith("uv run "):

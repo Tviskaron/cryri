@@ -10,7 +10,8 @@ DEFAULT_REGION = "SR006"
 class UvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
-    cache_dir: str = "${PWD}/.cache/uv"
+    cache_dir: Optional[str] = None
+    prefetch_cache: bool = False
     verbose: bool = False
 
 

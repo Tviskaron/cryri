@@ -11,6 +11,17 @@ DATETIME_FORMAT = "%Y_%m_%d_%H%M"
 HASH_LENGTH = 6
 
 
+def _extract_user_home(work_dir: str) -> str:
+    """Extract user home dir from a path like /home/jovyan/username/...
+
+    Returns e.g. '/home/jovyan/username'.
+    """
+    parts = Path(work_dir).parts
+    if len(parts) > 3:
+        return str(Path(*parts[:4]))
+    return str(Path(work_dir))
+
+
 def _extract_user_and_dir(work_dir: str) -> str:
     """Extract 'username-dirname' from a path like /home/jovyan/username/.../dirname."""
     parts = Path(work_dir).parts

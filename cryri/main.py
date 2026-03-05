@@ -290,6 +290,14 @@ def submit(
         raise typer.Exit()
 
     if cfg.container.setup_command:
+        venv_exists = Path(".venv").exists()
+        if not venv_exists and not yes:
+            if not Confirm.ask(
+                f"[yellow]No .venv found.[/yellow] Setup will create one via: [bold]{cfg.container.setup_command}[/bold]\n  Proceed?",
+                default=True,
+            ):
+                print_error("Setup cancelled.")
+                raise typer.Exit()
         console.print(f"[bold green]Running setup:[/bold green] {cfg.container.setup_command}")
         result = subprocess.run(cfg.container.setup_command, shell=True)
         if result.returncode != 0:
