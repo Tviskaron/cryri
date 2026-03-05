@@ -115,13 +115,9 @@ class JobManager:
             cfg.container.work_dir = create_run_copy(cfg.container)
 
         if cfg.container.uv.enabled and cfg.container.run_from_copy:
-            if cfg.container.uv.prefetch_cache:
-                # Keep cache (prefetched deps), exclude venv (not portable)
-                if ".venv/" not in cfg.container.exclude_from_copy:
-                    cfg.container.exclude_from_copy.append(".venv/")
-            else:
-                if ".cache/" not in cfg.container.exclude_from_copy:
-                    cfg.container.exclude_from_copy.append(".cache/")
+            for pattern in (".cache/", ".venv/"):
+                if pattern not in cfg.container.exclude_from_copy:
+                    cfg.container.exclude_from_copy.append(pattern)
 
         job_description = create_job_description(cfg)
 
