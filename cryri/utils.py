@@ -11,15 +11,20 @@ DATETIME_FORMAT = "%Y_%m_%d_%H%M"
 HASH_LENGTH = 6
 
 
+def _extract_user_and_dir(work_dir: str) -> str:
+    """Extract 'username-dirname' from a path like /home/jovyan/username/.../dirname."""
+    parts = Path(work_dir).parts
+    username = parts[3] if len(parts) > 3 else None
+    dirname = parts[-1] if parts else ""
+    if username and username != dirname:
+        return f"{username}-{dirname}"
+    return dirname or work_dir
+
+
 def create_job_description(cfg: CryConfig) -> str:
     job_description = cfg.cloud.description
     if job_description is None:
-        job_description = cfg.container.work_dir
-        for prefix in ['/home/jovyan']:
-            if job_description.startswith(prefix):
-                job_description = job_description[len(prefix):]
-                break
-        job_description = job_description.replace('/', '-')
+        job_description = _extract_user_and_dir(cfg.container.work_dir)
 
     team_name = None
     if cfg.container.environment is not None:

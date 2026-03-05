@@ -76,14 +76,14 @@ def test_container_config_with_uv():
 @mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_basic(basic_config):
     description = create_job_description(basic_config)
-    assert description == "-test-dir"
+    assert description == "dir"
 
 
 @mock_path_resolution(cwd="/mock/fake/dir")
 def test_create_job_description_with_team(basic_config):
     basic_config.container.environment = {"TEAM_NAME": "test-team"}
     description = create_job_description(basic_config)
-    assert description == "-test-dir #test-team"
+    assert description == "dir #test-team"
 
 
 @mock_env_vars(

@@ -24,6 +24,7 @@ from cryri.display import (
     prompt_select,
 )
 from cryri.job_manager import JobManager, JobNotFoundError, ClientLibMissingError
+from cryri.utils import _extract_user_and_dir
 
 app = typer.Typer(no_args_is_help=True, rich_markup_mode="rich")
 
@@ -92,9 +93,8 @@ def init(
     """Interactive wizard to create a job config file."""
     console.print("\n  [bold cyan]Welcome to cryri![/bold cyan] Let's set up your job.\n")
 
-    # Derive default description from parent_dir-current_dir
     cwd = Path.cwd()
-    default_description = f"{cwd.parent.name}-{cwd.name}"
+    default_description = _extract_user_and_dir(str(cwd))
 
     COMMAND_CHOICES = [
         "python3 main.py",
