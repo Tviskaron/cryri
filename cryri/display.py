@@ -42,6 +42,8 @@ def render_config_panel(cfg) -> Panel:
         lines.append(f"[bold]Work dir:[/bold]      {c.work_dir}")
     if c.run_from_copy:
         lines.append(f"[bold]Run from copy:[/bold] True")
+    if c.uv.enabled:
+        lines.append(f"[bold]uv:[/bold]            enabled (cache: {c.uv.cache_dir})")
     if cl.description:
         lines.append(f"[bold]Description:[/bold]   {cl.description}")
     if c.environment:

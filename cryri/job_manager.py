@@ -114,10 +114,24 @@ class JobManager:
                 )
             cfg.container.work_dir = create_run_copy(cfg.container)
 
+        if cfg.container.uv.enabled and cfg.container.run_from_copy:
+            if ".cache/" not in cfg.container.exclude_from_copy:
+                cfg.container.exclude_from_copy.append(".cache/")
+
         job_description = create_job_description(cfg)
 
         quoted_dir = shlex.quote(cfg.container.work_dir)
-        run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
+
+        if cfg.container.uv.enabled:
+            cache_dir = cfg.container.uv.cache_dir
+            user_cmd = cfg.container.command
+            if user_cmd.startswith("uv run "):
+                inner_cmd = f'cd {quoted_dir} && pip install uv && export UV_CACHE_DIR="{cache_dir}" && uv sync --no-install-project && {user_cmd}'
+            else:
+                inner_cmd = f'cd {quoted_dir} && pip install uv && export UV_CACHE_DIR="{cache_dir}" && uv sync --no-install-project && uv run {user_cmd}'
+            run_script = f"bash -c {shlex.quote(inner_cmd)}"
+        else:
+            run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
 
         if api.use_legacy_backend():
             client_lib = _require_client_lib()
