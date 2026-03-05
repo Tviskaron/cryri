@@ -1,10 +1,12 @@
 import re
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 import yaml
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from rich.prompt import Confirm
 
 from cryri import __version__
@@ -68,6 +70,33 @@ def _resolve_job_interactive(jm: JobManager, hash: Optional[str], action: str) -
         raise typer.Exit()
 
     return interactive_job_select(structured, action)
+
+
+_DURATION_RE = re.compile(r"^(\d+)([smh])$")
+
+
+def _parse_duration(value: str) -> int:
+    """Parse a duration string (e.g. '3m', '60s', '1h') into seconds."""
+    m = _DURATION_RE.match(value.strip())
+    if not m:
+        raise typer.BadParameter(f"Invalid duration: {value} (use e.g. 60s, 3m, 1h)")
+    amount, unit = int(m.group(1)), m.group(2)
+    return amount * {"s": 1, "m": 60, "h": 3600}[unit]
+
+
+def _countdown(seconds: int) -> None:
+    """Show a Rich progress bar counting down *seconds*."""
+    with Progress(
+        TextColumn("[yellow]Retrying in"),
+        BarColumn(),
+        TimeRemainingColumn(elapsed_when_finished=False),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("countdown", total=seconds)
+        for _ in range(seconds):
+            time.sleep(1)
+            progress.advance(task)
 
 
 _SINCE_RE = re.compile(r"^(\d+)([mhd])$")
@@ -219,6 +248,7 @@ def submit(
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Override number of workers."),
     uv: bool = typer.Option(False, "--uv", help="Enable uv for dependency management."),
     follow_logs: bool = typer.Option(False, "--logs", "-l", help="Follow logs after submission."),
+    retry: Optional[str] = typer.Option(None, "--retry", help="Retry interval on failure (e.g. 3m, 60s, 1h)."),
 ):
     """Submit a job from a YAML config file."""
     try:
@@ -257,14 +287,21 @@ def submit(
         print_error("Submission cancelled.")
         raise typer.Exit()
 
-    try:
-        jm = JobManager(cfg.cloud.region)
-        with console.status("[bold green]Submitting job...[/bold green]"):
-            status = jm.submit_run(cfg)
-        print_success(f"Job submitted: {status}")
-    except (ApiError, ClientLibMissingError, ValueError) as e:
-        print_error(f"Failed to submit job: {e}")
-        raise typer.Exit(code=1)
+    retry_seconds = _parse_duration(retry) if retry else None
+    jm = JobManager(cfg.cloud.region)
+
+    while True:
+        try:
+            with console.status("[bold green]Submitting job...[/bold green]"):
+                status = jm.submit_run(cfg)
+            print_success(f"Job submitted: {status}")
+            break
+        except (ApiError, ClientLibMissingError, ValueError) as e:
+            if retry_seconds is None:
+                print_error(f"Failed to submit job: {e}")
+                raise typer.Exit(code=1)
+            print_error(f"Failed to submit job: {e}")
+            _countdown(retry_seconds)
 
     if follow_logs:
         try:
