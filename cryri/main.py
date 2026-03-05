@@ -1,3 +1,4 @@
+import os
 import re
 import subprocess
 import time
@@ -163,7 +164,8 @@ def init(
     # Build config dict
     container = {"command": command, "image": image, "work_dir": work_dir or ".", "run_from_copy": False}
     if use_uv:
-        container["uv"] = {"enabled": True}
+        uv_cache_dir = f"{_extract_user_home(str(cwd))}/.cache/uv"
+        container["uv"] = {"enabled": True, "cache_dir": uv_cache_dir}
         container["setup_command"] = "uv sync --python 3.11.5 --python-preference only-managed"
 
     cloud = {
@@ -304,7 +306,10 @@ def submit(
         if cache_dir:
             console.print(f"[bold green]UV cache dir:[/bold green]  {cache_dir}")
         console.print(f"[bold green]Running setup:[/bold green] {cfg.container.setup_command}")
-        result = subprocess.run(cfg.container.setup_command, shell=True)
+        setup_env = None
+        if cache_dir:
+            setup_env = {**os.environ, "UV_CACHE_DIR": cache_dir}
+        result = subprocess.run(cfg.container.setup_command, shell=True, env=setup_env)
         if result.returncode != 0:
             print_error(f"Setup command failed with exit code {result.returncode}")
             raise typer.Exit(code=1)
