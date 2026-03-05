@@ -99,7 +99,7 @@ def test_submit_run_uv_enabled(mock_submit_job, _mock_legacy):
     script = kwargs.get("script")
     assert "pip install uv" in script
     assert "uv sync --no-install-project" in script
-    assert "uv run python main.py" in script
+    assert "uv run --no-sync python main.py" in script
 
 
 TEST_CONFIG_UV_RUN_YAML = """
