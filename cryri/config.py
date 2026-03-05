@@ -19,6 +19,7 @@ class ContainerConfig(BaseModel):
 
     image: Optional[str] = None
     command: Optional[str] = None
+    setup_command: Optional[str] = None
     environment: Annotated[Optional[Dict], AfterValidator(expand_vars_and_user)] = None
 
     work_dir: Annotated[

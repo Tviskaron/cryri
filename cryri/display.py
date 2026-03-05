@@ -30,6 +30,8 @@ def render_config_panel(cfg) -> Panel:
 
     if c.image:
         lines.append(f"[bold]Image:[/bold]         {c.image}")
+    if c.setup_command:
+        lines.append(f"[bold]Setup:[/bold]         {c.setup_command}")
     if c.command:
         lines.append(f"[bold]Command:[/bold]       {c.command}")
     if cl.instance_type:

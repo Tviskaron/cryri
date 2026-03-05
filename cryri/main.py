@@ -163,6 +163,7 @@ def init(
     container = {"command": command, "image": image, "work_dir": work_dir or ".", "run_from_copy": False}
     if use_uv:
         container["uv"] = {"enabled": True}
+        container["setup_command"] = "uv sync"
 
     cloud = {
         "description": description or default_description,
