@@ -1,4 +1,5 @@
 import re
+import subprocess
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -287,6 +288,13 @@ def submit(
     if not yes and not confirm_submission():
         print_error("Submission cancelled.")
         raise typer.Exit()
+
+    if cfg.container.setup_command:
+        console.print(f"[bold green]Running setup:[/bold green] {cfg.container.setup_command}")
+        result = subprocess.run(cfg.container.setup_command, shell=True)
+        if result.returncode != 0:
+            print_error(f"Setup command failed with exit code {result.returncode}")
+            raise typer.Exit(code=1)
 
     retry_seconds = _parse_duration(retry) if retry else None
     jm = JobManager(cfg.cloud.region)

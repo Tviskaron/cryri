@@ -122,20 +122,17 @@ class JobManager:
 
         quoted_dir = shlex.quote(cfg.container.work_dir)
 
-        setup = cfg.container.setup_command
-        setup_part = f"{setup} && " if setup else ""
-
         if cfg.container.uv.enabled:
             cache_dir = cfg.container.uv.cache_dir
             quiet = "" if cfg.container.uv.verbose else " -q"
             user_cmd = cfg.container.command
             if user_cmd.startswith("uv run "):
-                inner_cmd = f'cd {quoted_dir} && pip install{quiet} uv && export UV_CACHE_DIR="{cache_dir}" && {setup_part}uv sync{quiet} --no-install-project && {user_cmd}'
+                inner_cmd = f'cd {quoted_dir} && pip install{quiet} uv && export UV_CACHE_DIR="{cache_dir}" && uv sync{quiet} --no-install-project && {user_cmd}'
             else:
-                inner_cmd = f'cd {quoted_dir} && pip install{quiet} uv && export UV_CACHE_DIR="{cache_dir}" && {setup_part}uv sync{quiet} --no-install-project && uv run --no-sync {user_cmd}'
+                inner_cmd = f'cd {quoted_dir} && pip install{quiet} uv && export UV_CACHE_DIR="{cache_dir}" && uv sync{quiet} --no-install-project && uv run --no-sync {user_cmd}'
             run_script = f"bash -c {shlex.quote(inner_cmd)}"
         else:
-            run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {setup_part}{cfg.container.command}')}"
+            run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
 
         if api.use_legacy_backend():
             client_lib = _require_client_lib()
