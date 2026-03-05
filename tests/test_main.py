@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from cryri.config import CryConfig, ContainerConfig, CloudConfig
+from cryri.config import CryConfig, ContainerConfig, CloudConfig, UvConfig
 from cryri.job_manager import JobManager
 from cryri.utils import (
     create_job_description
@@ -45,6 +45,32 @@ def test_container_config_defaults():
     assert config.work_dir is None
     assert config.run_from_copy is False
     assert config.cry_copy_dir is None
+    assert config.uv.enabled is False
+    assert config.uv.cache_dir == "${PWD}/.cache/uv"
+
+
+def test_uv_config_defaults():
+    uv = UvConfig()
+    assert uv.enabled is False
+    assert uv.cache_dir == "${PWD}/.cache/uv"
+
+
+def test_uv_config_custom():
+    uv = UvConfig(enabled=True, cache_dir="/custom/cache")
+    assert uv.enabled is True
+    assert uv.cache_dir == "/custom/cache"
+
+
+@mock_path_resolution(force_is_dir=make_is_dir_mock())
+def test_container_config_with_uv():
+    config = ContainerConfig(
+        image="test-image:latest",
+        command="python script.py",
+        work_dir="/test/dir",
+        uv=UvConfig(enabled=True),
+    )
+    assert config.uv.enabled is True
+    assert config.uv.cache_dir == "${PWD}/.cache/uv"
 
 
 @mock_path_resolution(cwd="/mock/fake/dir")

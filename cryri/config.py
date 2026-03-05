@@ -7,6 +7,12 @@ from cryri.validators import expand_vars_and_user, sanitize_dir_path
 DEFAULT_REGION = "SR006"
 
 
+class UvConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    cache_dir: str = "${PWD}/.cache/uv"
+
+
 class ContainerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,6 +35,8 @@ class ContainerConfig(BaseModel):
     ] = None
 
     exclude_from_copy: List[str] = []
+
+    uv: UvConfig = UvConfig()
 
 
 class CloudConfig(BaseModel):

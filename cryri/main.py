@@ -9,7 +9,7 @@ from rich.prompt import Confirm
 
 from cryri import __version__
 from cryri.api import ApiError
-from cryri.config import CryConfig, CloudConfig, DEFAULT_REGION
+from cryri.config import CryConfig, CloudConfig, UvConfig, DEFAULT_REGION
 from cryri.display import (
     console,
     setup_logging,
@@ -102,6 +102,7 @@ def init(
     ]
     IMAGE_CHOICES = [
         "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py311:0.0.36",
+        "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py311-uv:0.0.36",
     ]
     WORKDIR_CHOICES = [
         ".",
@@ -128,8 +129,12 @@ def init(
     region = prompt_select("Region", REGION_CHOICES)
     description = prompt_select("Description", DESCRIPTION_CHOICES)
 
+    use_uv = Confirm.ask("  [bold]Use uv for dependency management?[/bold]", default=False)
+
     # Build config dict
     container = {"command": command, "image": image, "work_dir": work_dir or ".", "run_from_copy": False}
+    if use_uv:
+        container["uv"] = {"enabled": True}
 
     cloud = {
         "description": description or default_description,
@@ -205,6 +210,7 @@ def submit(
     instance: Optional[str] = typer.Option(None, "--instance", "-i", help="Override instance type."),
     env: Optional[List[str]] = typer.Option(None, "--env", "-e", help="Override env var (KEY=VALUE, repeatable)."),
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Override number of workers."),
+    uv: bool = typer.Option(False, "--uv", help="Enable uv for dependency management."),
 ):
     """Submit a job from a YAML config file."""
     try:
@@ -234,6 +240,8 @@ def submit(
                 raise typer.Exit(code=1)
             k, v = item.split("=", 1)
             cfg.container.environment[k.strip()] = v.strip()
+    if uv:
+        cfg.container.uv.enabled = True
 
     console.print(render_config_panel(cfg))
 

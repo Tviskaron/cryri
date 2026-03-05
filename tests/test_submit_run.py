@@ -4,7 +4,7 @@ import subprocess
 from unittest.mock import patch, MagicMock
 
 import yaml
-from cryri.config import CryConfig
+from cryri.config import CryConfig, UvConfig
 from cryri.job_manager import JobManager
 
 
@@ -66,3 +66,70 @@ def test_submit_run_executes_command(mock_submit_job, _mock_legacy):
     assert result.returncode == 0, f"Subprocess failed with stderr: {result.stderr}"
     assert result.stderr == "", f"Subprocess produced stderr: {result.stderr}"
     assert "double quotes" in result.stdout
+
+
+TEST_CONFIG_UV_YAML = """
+container:
+  image: "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py310:0.0.36"
+  command: python main.py
+  work_dir: '.'
+  uv:
+    enabled: true
+
+cloud:
+  region: "SR004"
+  instance_type: "a100.1gpu"
+  n_workers: 1
+"""
+
+
+@patch("cryri.api.use_legacy_backend", return_value=False)
+@patch("cryri.api.submit_job")
+def test_submit_run_uv_enabled(mock_submit_job, _mock_legacy):
+    """Test that uv-enabled submission generates the correct script."""
+    mock_submit_job.return_value = {"job_name": "uv_job_123"}
+
+    config_dict = yaml.safe_load(TEST_CONFIG_UV_YAML)
+    cfg = CryConfig(**config_dict)
+
+    jm = JobManager(cfg.cloud.region)
+    jm.submit_run(cfg)
+
+    _, kwargs = mock_submit_job.call_args
+    script = kwargs.get("script")
+    assert "pip install uv" in script
+    assert "uv sync" in script
+    assert "uv run python main.py" in script
+
+
+TEST_CONFIG_UV_RUN_YAML = """
+container:
+  image: "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py310:0.0.36"
+  command: uv run pytest tests/
+  work_dir: '.'
+  uv:
+    enabled: true
+
+cloud:
+  region: "SR004"
+  instance_type: "a100.1gpu"
+  n_workers: 1
+"""
+
+
+@patch("cryri.api.use_legacy_backend", return_value=False)
+@patch("cryri.api.submit_job")
+def test_submit_run_uv_no_double_wrap(mock_submit_job, _mock_legacy):
+    """Test that a command already starting with 'uv run' is not double-wrapped."""
+    mock_submit_job.return_value = {"job_name": "uv_job_456"}
+
+    config_dict = yaml.safe_load(TEST_CONFIG_UV_RUN_YAML)
+    cfg = CryConfig(**config_dict)
+
+    jm = JobManager(cfg.cloud.region)
+    jm.submit_run(cfg)
+
+    _, kwargs = mock_submit_job.call_args
+    script = kwargs.get("script")
+    assert "uv run uv run" not in script
+    assert "uv run pytest tests/" in script
