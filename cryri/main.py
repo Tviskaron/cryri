@@ -102,7 +102,6 @@ def init(
     ]
     IMAGE_CHOICES = [
         "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py311:0.0.36",
-        "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py311-uv:0.0.36",
     ]
     WORKDIR_CHOICES = [
         ".",
