@@ -14,6 +14,7 @@ container:
   # uv:
   #   enabled: true
   #   cache_dir: "${PWD}/.cache/uv"
+  #   verbose: false
 cloud:
   region: "SR006"
   instance_type: "a100plus.1gpu.80vG.12C.96G"

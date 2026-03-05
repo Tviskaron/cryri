@@ -29,7 +29,7 @@ lint = ["flake8", "pylint"]
 Homepage = "https://github.com/Tviskaron/cryri"
 
 [project.scripts]
-cryri = "cryri.main:main"
+cr = "cryri.main:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "cryri.__version__" }

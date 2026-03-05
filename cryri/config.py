@@ -11,6 +11,7 @@ class UvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     cache_dir: str = "${PWD}/.cache/uv"
+    verbose: bool = False
 
 
 class ContainerConfig(BaseModel):
