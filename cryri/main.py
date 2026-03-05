@@ -27,7 +27,7 @@ from cryri.display import (
     prompt_select,
 )
 from cryri.job_manager import JobManager, JobNotFoundError, ClientLibMissingError
-from cryri.utils import _extract_user_and_dir
+from cryri.utils import _extract_user_and_dir, _extract_user_home
 
 app = typer.Typer(no_args_is_help=True, rich_markup_mode="rich")
 
@@ -298,6 +298,11 @@ def submit(
             ):
                 print_error("Setup cancelled.")
                 raise typer.Exit()
+        cache_dir = cfg.container.uv.cache_dir if cfg.container.uv.enabled and cfg.container.uv.cache_dir else None
+        if cache_dir is None and cfg.container.uv.enabled and cfg.container.work_dir:
+            cache_dir = f"{_extract_user_home(cfg.container.work_dir)}/.cache/uv"
+        if cache_dir:
+            console.print(f"[bold green]UV cache dir:[/bold green]  {cache_dir}")
         console.print(f"[bold green]Running setup:[/bold green] {cfg.container.setup_command}")
         result = subprocess.run(cfg.container.setup_command, shell=True)
         if result.returncode != 0:
