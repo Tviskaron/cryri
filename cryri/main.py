@@ -172,12 +172,20 @@ def init(
         )
     print_success(f"Config saved to {output}")
 
-    # Create starter main.py if using default command and it doesn't exist
+    # Create starter files if they don't exist
     if command == "python3 main.py" and not Path("main.py").exists():
         Path("main.py").write_text(
             'import os\n\nprint("Hello from cryri!")\nprint(f"Running on {os.uname().nodename}")\n'
         )
         print_success("Created starter main.py")
+
+    if use_uv and not Path("pyproject.toml").exists():
+        project_name = cwd.name
+        Path("pyproject.toml").write_text(
+            f'[project]\nname = "{project_name}"\nversion = "0.1.0"\n'
+            f'requires-python = ">=3.11"\ndependencies = []\n'
+        )
+        print_success("Created starter pyproject.toml")
 
 
 @app.command()
@@ -211,6 +219,7 @@ def submit(
     env: Optional[List[str]] = typer.Option(None, "--env", "-e", help="Override env var (KEY=VALUE, repeatable)."),
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Override number of workers."),
     uv: bool = typer.Option(False, "--uv", help="Enable uv for dependency management."),
+    follow_logs: bool = typer.Option(False, "--logs", "-l", help="Follow logs after submission."),
 ):
     """Submit a job from a YAML config file."""
     try:
@@ -257,6 +266,13 @@ def submit(
     except (ApiError, ClientLibMissingError, ValueError) as e:
         print_error(f"Failed to submit job: {e}")
         raise typer.Exit(code=1)
+
+    if follow_logs:
+        try:
+            jm.show_logs_follow(status)
+        except (ApiError, ClientLibMissingError) as e:
+            print_error(str(e))
+            raise typer.Exit(code=1)
 
 
 @app.command()

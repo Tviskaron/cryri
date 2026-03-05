@@ -126,9 +126,9 @@ class JobManager:
             cache_dir = cfg.container.uv.cache_dir
             user_cmd = cfg.container.command
             if user_cmd.startswith("uv run "):
-                inner_cmd = f'cd {quoted_dir} && pip install uv && export UV_CACHE_DIR="{cache_dir}" && uv sync --no-install-project && {user_cmd}'
+                inner_cmd = f'cd {quoted_dir} && pip install -q uv && export UV_CACHE_DIR="{cache_dir}" && uv sync -q --no-install-project && {user_cmd}'
             else:
-                inner_cmd = f'cd {quoted_dir} && pip install uv && export UV_CACHE_DIR="{cache_dir}" && uv sync --no-install-project && uv run --no-sync {user_cmd}'
+                inner_cmd = f'cd {quoted_dir} && pip install -q uv && export UV_CACHE_DIR="{cache_dir}" && uv sync -q --no-install-project && uv run --no-sync {user_cmd}'
             run_script = f"bash -c {shlex.quote(inner_cmd)}"
         else:
             run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
