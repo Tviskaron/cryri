@@ -209,7 +209,9 @@ def stream_logs(
 
 
 _FINISHED_STATUSES = {"Completed", "Failed", "Error", "Killed"}
+_PENDING_STATUSES = {"Pending", "unknown"}
 _FOLLOW_RECONNECT_DELAY = 5  # seconds
+_WAIT_POLL_INTERVAL = 5  # seconds
 
 
 def stream_logs_follow(
@@ -249,6 +251,34 @@ def stream_logs_follow(
             time.sleep(_FOLLOW_RECONNECT_DELAY)
         except KeyboardInterrupt:
             return
+
+
+def wait_for_job_start(
+    job_name: str,
+    region: Optional[str] = None,
+    timeout: int = 600,
+) -> str:
+    """Poll until job leaves Pending state. Returns the new status."""
+    start = time.monotonic()
+    while True:
+        try:
+            jobs = list_jobs(region=region)
+            for j in jobs:
+                if j.get("job_name") == job_name:
+                    status = j.get("status", "unknown")
+                    if status not in _PENDING_STATUSES:
+                        return status
+                    break
+        except ApiError:
+            pass
+
+        if time.monotonic() - start > timeout:
+            raise ApiError(0, f"Job {job_name} still pending after {timeout}s")
+
+        try:
+            time.sleep(_WAIT_POLL_INTERVAL)
+        except KeyboardInterrupt:
+            return "interrupted"
 
 
 def kill_job(job_name: str, region: str) -> str:

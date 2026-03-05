@@ -331,8 +331,15 @@ def submit(
             _countdown(retry_seconds)
 
     if follow_logs:
-        console.print("[bold green]Following logs...[/bold green]")
         try:
+            with console.status("[bold yellow]Waiting for job to start...[/bold yellow]"):
+                job_status = jm.wait_for_start(status)
+            if job_status == "interrupted":
+                raise typer.Exit()
+            if job_status in ("Failed", "Error", "Killed"):
+                print_error(f"Job ended with status: {job_status}")
+                raise typer.Exit(code=1)
+            console.print("[bold green]Job started, streaming logs...[/bold green]")
             jm.show_logs_follow(status)
         except (ApiError, ClientLibMissingError) as e:
             print_error(str(e))

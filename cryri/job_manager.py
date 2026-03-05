@@ -115,13 +115,9 @@ class JobManager:
             cfg.container.work_dir = create_run_copy(cfg.container)
 
         if cfg.container.uv.enabled and cfg.container.run_from_copy:
-            if cfg.container.uv.prefetch_cache:
-                # Keep cache (prefetched deps), exclude venv (not portable)
-                if ".venv/" not in cfg.container.exclude_from_copy:
-                    cfg.container.exclude_from_copy.append(".venv/")
-            else:
-                if ".cache/" not in cfg.container.exclude_from_copy:
-                    cfg.container.exclude_from_copy.append(".cache/")
+            for pattern in (".cache/", ".venv/"):
+                if pattern not in cfg.container.exclude_from_copy:
+                    cfg.container.exclude_from_copy.append(pattern)
 
         job_description = create_job_description(cfg)
 
@@ -195,6 +191,10 @@ class JobManager:
             if job["job_name"] == job_name:
                 return job.get("status", "unknown")
         return "unknown"
+
+    def wait_for_start(self, job_name: str, timeout: int = 600) -> str:
+        """Poll until job leaves Pending state. Returns the new status."""
+        return api.wait_for_job_start(job_name, region=self.region, timeout=timeout)
 
     def show_logs_follow(self, job_name: str, raw: bool = False) -> None:
         """Stream logs with auto-reconnect until job finishes."""

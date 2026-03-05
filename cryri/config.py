@@ -11,7 +11,6 @@ class UvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     cache_dir: Optional[str] = None
-    prefetch_cache: bool = False
     verbose: bool = False
 
 
