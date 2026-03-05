@@ -304,6 +304,7 @@ def submit(
             _countdown(retry_seconds)
 
     if follow_logs:
+        console.print("[bold green]Following logs...[/bold green]")
         try:
             jm.show_logs_follow(status)
         except (ApiError, ClientLibMissingError) as e:
