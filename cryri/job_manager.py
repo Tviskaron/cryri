@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from cryri import api
 from cryri.api import ApiError
 from cryri.config import CryConfig
+from cryri.script_builder import create_batch_script_file
 from cryri.utils import create_run_copy, create_job_description
 
 
@@ -116,8 +117,17 @@ class JobManager:
 
         job_description = create_job_description(cfg)
 
-        quoted_dir = shlex.quote(cfg.container.work_dir)
-        run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
+        if isinstance(cfg.container.command, list):
+            script_name = create_batch_script_file(
+                work_dir=cfg.container.work_dir,
+                commands=cfg.container.command,
+                parallel=cfg.container.execution.parallel,
+            )
+            quoted_dir = shlex.quote(cfg.container.work_dir)
+            run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && bash {shlex.quote(script_name)}')}"
+        else:
+            quoted_dir = shlex.quote(cfg.container.work_dir)
+            run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
 
         if api.use_legacy_backend():
             client_lib = _require_client_lib()

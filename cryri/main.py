@@ -9,7 +9,7 @@ from rich.prompt import Confirm
 
 from cryri import __version__
 from cryri.api import ApiError
-from cryri.config import CryConfig, CloudConfig, DEFAULT_REGION
+from cryri.config import CryConfig, DEFAULT_REGION
 from cryri.display import (
     console,
     setup_logging,
@@ -20,7 +20,6 @@ from cryri.display import (
     interactive_job_select,
     print_success,
     print_error,
-    prompt_text,
     prompt_select,
 )
 from cryri.job_manager import JobManager, JobNotFoundError, ClientLibMissingError

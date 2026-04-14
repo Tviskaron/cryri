@@ -66,3 +66,53 @@ def test_submit_run_executes_command(mock_submit_job, _mock_legacy):
     assert result.returncode == 0, f"Subprocess failed with stderr: {result.stderr}"
     assert result.stderr == "", f"Subprocess produced stderr: {result.stderr}"
     assert "double quotes" in result.stdout
+
+
+@patch("cryri.api.use_legacy_backend", return_value=False)
+@patch("cryri.api.submit_job")
+def test_submit_run_batched_commands_executes_all(mock_submit_job, _mock_legacy, tmp_path):
+    mock_submit_job.return_value = {"job_name": "test_job_id_456"}
+
+    config_dict = {
+        "container": {
+            "image": "cr.ai.cloud.ru/aicloud-base-images/cuda12.1-torch2-py310:0.0.36",
+            "command": [
+                "echo first",
+                "sleep 0.1 && echo second",
+                "echo third",
+            ],
+            "execution": {"parallel": 2},
+            "work_dir": str(tmp_path),
+        },
+        "cloud": {
+            "region": "SR004",
+            "instance_type": "cpu.2C.8G",
+            "n_workers": 1,
+            "description": "batched submit test",
+        },
+    }
+    cfg = CryConfig(**config_dict)
+
+    jm = JobManager(cfg.cloud.region)
+    job_id = jm.submit_run(cfg)
+    assert job_id == "test_job_id_456"
+
+    _, kwargs = mock_submit_job.call_args
+    script_command = kwargs.get("script")
+    assert script_command is not None
+    assert script_command.startswith("bash -c ")
+    assert ".cryri/batch_scripts/cryri_batch_" in script_command
+
+    result = subprocess.run(
+        script_command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, f"Subprocess failed with stderr: {result.stderr}"
+    assert "[cryri] Starting execution" in result.stdout
+    assert "first" in result.stdout
+    assert "second" in result.stdout
+    assert "third" in result.stdout

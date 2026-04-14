@@ -4,12 +4,14 @@ from typing import List, Dict
 
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markup import escape
 from rich.panel import Panel
-from rich.prompt import Confirm, IntPrompt, Prompt
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
 _SECRET_KEY_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD)", re.IGNORECASE)
+_BATCH_COLORS = ["cyan", "green", "magenta", "yellow", "blue", "bright_cyan"]
 
 console = Console()
 
@@ -31,7 +33,18 @@ def render_config_panel(cfg) -> Panel:
     if c.image:
         lines.append(f"[bold]Image:[/bold]         {c.image}")
     if c.command:
-        lines.append(f"[bold]Command:[/bold]       {c.command}")
+        if isinstance(c.command, list):
+            lines.append(f"[bold]Commands:[/bold]      {len(c.command)} entries")
+            lines.append(f"[bold]Parallel:[/bold]      {c.execution.parallel}")
+            total_batches = 1 if c.execution.parallel <= 0 else (len(c.command) + c.execution.parallel - 1) // c.execution.parallel
+            for idx, cmd in enumerate(c.command, start=1):
+                batch_idx = 1 if c.execution.parallel <= 0 else ((idx - 1) // c.execution.parallel) + 1
+                color = _BATCH_COLORS[(batch_idx - 1) % len(_BATCH_COLORS)]
+                lines.append(
+                    f"  [{color}]{batch_idx}/{total_batches}: {escape(cmd)}[/{color}]"
+                )
+        else:
+            lines.append(f"[bold]Command:[/bold]       {c.command}")
     if cl.instance_type:
         lines.append(f"[bold]Instance:[/bold]      {cl.instance_type}")
     if cl.region:
@@ -41,7 +54,7 @@ def render_config_panel(cfg) -> Panel:
     if c.work_dir:
         lines.append(f"[bold]Work dir:[/bold]      {c.work_dir}")
     if c.run_from_copy:
-        lines.append(f"[bold]Run from copy:[/bold] True")
+        lines.append("[bold]Run from copy:[/bold] True")
     if cl.description:
         lines.append(f"[bold]Description:[/bold]   {cl.description}")
     if c.environment:

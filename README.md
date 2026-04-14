@@ -12,6 +12,16 @@ pip install git+https://github.com/Tviskaron/cryri.git
 
 ## Features
 
+### Batching Terminology
+
+To make batching abstractions explicit, cryri uses these names:
+
+- **Submission Unit**: one cloud job submitted by cryri (one `/run_job` API call).
+- **Command Batch**: multiple shell commands inside a single Submission Unit.
+  - `container.command` is a **string** -> single command (no batching).
+  - `container.command` is a **list** -> batched command execution in one job.
+  - `container.execution.parallel` controls how many commands run in parallel per batch.
+
 ### List Running Jobs
 
 
@@ -35,7 +45,7 @@ cryri --instance_types --region SR006
 
 Submit a containerized job using a YAML configuration file:
 
-The configuration file must follow the structure defined below: 
+The configuration file must follow the structure defined below:
 
 ```bash
 cryri run.yaml
@@ -56,40 +66,60 @@ cloud:
   region: "SR006"                                                                        # Cloud region to deploy the job
   instance_type: "a100plus.1gpu.80vG.12C.96G"                                            # Type of cloud instance
   n_workers: 1                                                                           # Number of worker instances, 1 is only option
-  description: "test job"                                                                # Job description 
+  description: "test job"                                                                # Job description
+```
+
+Command batching example (single submission, 3 commands in parallel at a time):
+
+```yaml
+container:
+  image: "cr.ai.cloud.ru/your/image"
+  command:
+    - "echo start && sleep 1"
+    - "echo step-1 && sleep 2"
+    - "echo step-2 && sleep 2"
+    - "echo step-3 && sleep 2"
+    - "echo done"
+  execution:
+    parallel: 3
+  work_dir: "."
+cloud:
+  region: "SR006"
+  instance_type: "cpu.2C.8G"
+  n_workers: 1
 ```
 
 ### Typical Use Case
 
 1. **Prepare Docker Image** (see recommendations below)
-   - Build your Docker image, tag it with the `job-custom-image-` prefix, and push it to the cloud registry.  
+   - Build your Docker image, tag it with the `job-custom-image-` prefix, and push it to the cloud registry.
    - Example: Use the image `job-custom-image-follower` or create your own with the required prefix.
 
-2. **Set Up Local Directory**  
-   - Create a local directory containing the code for your job. The simplest way is to clone a repository from GitHub.  
-     Example for the "Follower" project:  
+2. **Set Up Local Directory**
+   - Create a local directory containing the code for your job. The simplest way is to clone a repository from GitHub.
+     Example for the "Follower" project:
      ```bash
      git clone https://github.com/CognitiveAISystems/learn-to-follow
      ```
 
-3. **Create and Run Job**  
-   - Inside the folder, create a `run.yaml` file with the necessary configuration. You can use the example provided earlier as a template.  
-   - Start the job using:  
+3. **Create and Run Job**
+   - Inside the folder, create a `run.yaml` file with the necessary configuration. You can use the example provided earlier as a template.
+   - Start the job using:
      ```bash
      cryri run.yaml
      ```
 
-4. **Concurrent Experimentation**  
-   - For multiple concurrent experiments from the same directory, set the `run_from_copy` flag to `True` in `run.yaml`. This ensures each run uses a unique directory, stored at the `cry_copy_dir` path.  
+4. **Concurrent Experimentation**
+   - For multiple concurrent experiments from the same directory, set the `run_from_copy` flag to `True` in `run.yaml`. This ensures each run uses a unique directory, stored at the `cry_copy_dir` path.
      ```yaml
      run_from_copy: True
      ```
 
 5. **Environment variables expansion**
    - Several fields — `environment`, `work_dir`, `cry_copy_dir` — support environment variables `$XXX` and user home directory `~` expansion.
-   - With this feature, you can 
-     - pass environment variables directly to the docker container via `environment` field, e.g. `"WANDB_API_KEY": "$WANDB_API_KEY"`; 
-     - or use an env var to specify `cry_copy_dir` location `cry_copy_dir: $PERSONAL_HOME/.cryri`. 
+   - With this feature, you can
+     - pass environment variables directly to the docker container via `environment` field, e.g. `"WANDB_API_KEY": "$WANDB_API_KEY"`;
+     - or use an env var to specify `cry_copy_dir` location `cry_copy_dir: $PERSONAL_HOME/.cryri`.
    - Expansion uses your (=caller) current context.
    - You can also use paths relative to your HOME directory, e.g. `~/path/to/somewhere`. It will be expanded using your `$HOME` variable.
 

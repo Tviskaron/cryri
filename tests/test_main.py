@@ -45,6 +45,7 @@ def test_container_config_defaults():
     assert config.work_dir is None
     assert config.run_from_copy is False
     assert config.cry_copy_dir is None
+    assert config.execution.parallel == 1
 
 
 @mock_path_resolution(cwd="/mock/fake/dir")
@@ -87,6 +88,23 @@ def test_container_config_expand_resolve_fields_validators():
     }
     assert config.work_dir == "/mock/fake_dir"
     assert config.cry_copy_dir == "/mock/fake_user/sub_user/.cryri"
+
+
+def test_container_config_command_list_and_parallel_valid():
+    cfg = ContainerConfig(
+        command=["echo one", "echo two"],
+        execution={"parallel": 2},
+    )
+    assert isinstance(cfg.command, list)
+    assert cfg.execution.parallel == 2
+
+
+def test_container_config_string_command_parallel_rejected():
+    with pytest.raises(ValueError):
+        ContainerConfig(
+            command="echo one",
+            execution={"parallel": 2},
+        )
 
 
 def test_version():
