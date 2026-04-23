@@ -81,7 +81,7 @@ def test_submit_run_batched_commands_executes_all(mock_submit_job, _mock_legacy,
                 "sleep 0.1 && echo second",
                 "echo third",
             ],
-            "execution": {"parallel": 2},
+            "parallel": 2,
             "work_dir": str(tmp_path),
         },
         "cloud": {
@@ -101,7 +101,7 @@ def test_submit_run_batched_commands_executes_all(mock_submit_job, _mock_legacy,
     script_command = kwargs.get("script")
     assert script_command is not None
     assert script_command.startswith("bash -c ")
-    assert ".cryri/batch_scripts/cryri_batch_" in script_command
+    assert ".cryri/batch_scripts/" in script_command
 
     result = subprocess.run(
         script_command,

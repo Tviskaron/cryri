@@ -121,7 +121,7 @@ class JobManager:
             script_name = create_batch_script_file(
                 work_dir=cfg.container.work_dir,
                 commands=cfg.container.command,
-                parallel=cfg.container.execution.parallel,
+                parallel=cfg.container.parallel,
             )
             quoted_dir = shlex.quote(cfg.container.work_dir)
             run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && bash {shlex.quote(script_name)}')}"

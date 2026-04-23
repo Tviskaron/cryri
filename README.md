@@ -20,7 +20,7 @@ To make batching abstractions explicit, cryri uses these names:
 - **Command Batch**: multiple shell commands inside a single Submission Unit.
   - `container.command` is a **string** -> single command (no batching).
   - `container.command` is a **list** -> batched command execution in one job.
-  - `container.execution.parallel` controls how many commands run in parallel per batch.
+  - `container.parallel` controls how many commands run in parallel per batch.
 
 ### List Running Jobs
 
@@ -80,8 +80,7 @@ container:
     - "echo step-2 && sleep 2"
     - "echo step-3 && sleep 2"
     - "echo done"
-  execution:
-    parallel: 3
+  parallel: 3
   work_dir: "."
 cloud:
   region: "SR006"

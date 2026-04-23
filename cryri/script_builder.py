@@ -7,8 +7,6 @@ from typing import List, Tuple
 
 def _chunk_commands(commands: List[str], parallel: int) -> List[List[Tuple[int, str]]]:
     indexed = list(enumerate(commands, start=1))
-    if parallel <= 0:
-        return [indexed]
     return [indexed[i:i + parallel] for i in range(0, len(indexed), parallel)]
 
 

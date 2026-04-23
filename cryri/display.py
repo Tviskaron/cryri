@@ -35,10 +35,10 @@ def render_config_panel(cfg) -> Panel:
     if c.command:
         if isinstance(c.command, list):
             lines.append(f"[bold]Commands:[/bold]      {len(c.command)} entries")
-            lines.append(f"[bold]Parallel:[/bold]      {c.execution.parallel}")
-            total_batches = 1 if c.execution.parallel <= 0 else (len(c.command) + c.execution.parallel - 1) // c.execution.parallel
+            lines.append(f"[bold]Parallel:[/bold]      {c.parallel}")
+            total_batches = (len(c.command) + c.parallel - 1) // c.parallel
             for idx, cmd in enumerate(c.command, start=1):
-                batch_idx = 1 if c.execution.parallel <= 0 else ((idx - 1) // c.execution.parallel) + 1
+                batch_idx = ((idx - 1) // c.parallel) + 1
                 color = _BATCH_COLORS[(batch_idx - 1) % len(_BATCH_COLORS)]
                 lines.append(
                     f"  [{color}]{batch_idx}/{total_batches}: {escape(cmd)}[/{color}]"

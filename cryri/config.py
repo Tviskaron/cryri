@@ -29,10 +29,12 @@ class ContainerConfig(BaseModel):
     ] = None
 
     exclude_from_copy: List[str] = Field(default_factory=list)
-    execution: "ExecutionConfig" = Field(default_factory=lambda: ExecutionConfig())
+    parallel: int = 1
 
     @model_validator(mode="after")
-    def validate_command_and_execution(self):
+    def validate_command_and_parallel(self):
+        if self.parallel < 1:
+            raise ValueError("container.parallel must be >= 1")
         if isinstance(self.command, list):
             if not self.command:
                 raise ValueError("container.command list must not be empty")
@@ -42,19 +44,8 @@ class ContainerConfig(BaseModel):
         elif isinstance(self.command, str):
             if not self.command.strip():
                 raise ValueError("container.command must not be empty")
-            if self.execution.parallel != 1:
-                raise ValueError("container.execution.parallel is only supported when command is a list")
-        return self
-
-
-class ExecutionConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    parallel: int = 1
-
-    @model_validator(mode="after")
-    def validate_parallel(self):
-        if self.parallel < 0:
-            raise ValueError("container.execution.parallel must be >= 0")
+            if self.parallel != 1:
+                raise ValueError("container.parallel is only supported when command is a list")
         return self
 
 
