@@ -20,11 +20,20 @@ cryri logs JOB_NAME --source api --tail 100
 cryri logs JOB_NAME --full
 cryri status JOB_NAME --json
 cryri inspect JOB_NAME --history
+cryri params JOB_NAME
+cryri nodes JOB_NAME
 ```
+
+`inspect` shows job metadata; `--history` adds platform phase/history. `params` retrieves launch parameters, and `nodes` retrieves job nodes. History, parameters, and nodes require Public API credentials. Select a backend with global `--backend auto|gateway|public` before the subcommand; `auto` uses the Public API when configured and otherwise keeps gateway access.
 
 ## Personal credentials on shared notebooks
 
 Credentials are optional. From `/home/jovyan/<user>/...`, Cryri looks only in `/home/jovyan/<user>/.config/cryri/credentials.toml`; it does not use the shared account's home config. Override selection with `--user-home` / `CRYRI_USER_HOME` or `--config` / `CRYRI_CONFIG`. `cryri config` shows the selection without secrets. Gateway submissions add `[<user>]` to descriptions that do not already name the user; authenticated Public API submissions preserve the description. See the [personal configuration format and precedence](docs/status-and-logs.md#personal-configuration-on-shared-notebooks).
+
+```bash
+cryri config
+cryri --user-home /home/jovyan/alice config
+```
 
 ## Features
 
