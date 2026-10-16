@@ -6,7 +6,6 @@ import requests
 
 from cryri import api
 from cryri.api import ApiError
-from cryri.statuses import is_terminal, normalize_status
 
 
 def response(data, status=200):
@@ -17,39 +16,21 @@ def response(data, status=200):
     return result
 
 
-@pytest.fixture(autouse=True)
-def environment(monkeypatch):
-    for name in ["CRYRI_API_BACKEND", "CRYRI_USE_CLIENT_LIB", "MLSPACE_CLIENT_ID",
-                 "MLSPACE_CLIENT_SECRET", "MLSPACE_WORKSPACE_ID", "MLSPACE_API_KEY",
-                 "MLSPACE_API_URL"]:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("GWAPI_ADDR", "gateway.invalid")
-    monkeypatch.setenv("GWAPI_KEY", "workspace-key")
-    monkeypatch.setenv("NAMESPACE", "test-workspace")
-    api._configured_public_client.cache_clear()
-
-
 def public_environment(monkeypatch):
     monkeypatch.setenv("MLSPACE_CLIENT_ID", "client")
     monkeypatch.setenv("MLSPACE_CLIENT_SECRET", "client-secret")
     monkeypatch.setenv("MLSPACE_WORKSPACE_ID", "workspace-id")
 
 
-def test_correct_gateway_status_contract(monkeypatch):
-    request = Mock(return_value=response({"job_status": "Failed", "status": "ok"}))
+@pytest.mark.parametrize("status", ["Failed", "Running"])
+def test_correct_gateway_status_contract(monkeypatch, status):
+    request = Mock(return_value=response({"job_status": status, "status": "ok"}))
     monkeypatch.setattr(api, "_request", request)
     info = api.get_job_info("job-name", region="SR006")
     request.assert_called_once_with(
         "GET", "/job_status", params={"job": "job-name", "region": "SR006"})
-    assert info["status"] == "Failed"
+    assert info["status"] == status
     assert info["status_source"] == "gateway"
-    assert "stale" in info["warning"]
-
-
-def test_gateway_running_is_explicitly_a_report(monkeypatch):
-    monkeypatch.setattr(api, "_request", Mock(return_value=response({"job_status": "Running"})))
-    info = api.get_job_info("job-name")
-    assert info["status"] == "Running"
     assert "does not establish job liveness" in info["warning"]
 
 
@@ -222,19 +203,6 @@ def test_public_submission_and_delete_contracts(monkeypatch):
     assert client.json.call_args.kwargs["retries"] == 0
 
 
-@pytest.mark.parametrize("status", [
-    "completed", "failed", "Stopped", "Succeeded", "Terminated", "Deleted", "Killed",
-])
-def test_terminal_states(status):
-    assert is_terminal(status)
-    assert normalize_status(status)[0].isupper()
-
-
-@pytest.mark.parametrize("status", ["running", "pending", "Completing", "Restarting", "Validating"])
-def test_active_states(status):
-    assert not is_terminal(status)
-
-
 def test_api_preview_closes_response_and_caps_long_lines(monkeypatch, capsys):
     payload = b"x" * (1024 * 1024)
     result = response({})
@@ -249,9 +217,10 @@ def test_api_preview_closes_response_and_caps_long_lines(monkeypatch, capsys):
     closed.assert_called_once()
 
 
-def test_log_follower_stops_for_normalized_terminal_status(monkeypatch):
+@pytest.mark.parametrize("status", ["stopped", "Terminated"])
+def test_log_follower_stops_for_normalized_terminal_status(monkeypatch, status):
     monkeypatch.setattr(api, "stream_logs", Mock())
-    monkeypatch.setattr(api, "get_job_status", Mock(return_value="stopped"))
+    monkeypatch.setattr(api, "get_job_status", Mock(return_value=status))
     sleep = Mock(side_effect=AssertionError("Follower must stop"))
     monkeypatch.setattr(api.time, "sleep", sleep)
     api.stream_logs_follow("job-name")

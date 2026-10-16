@@ -128,6 +128,18 @@ class PersonalConfig:
         }
 
 
+def detect_personal_root(cwd=None):
+    """Mirror the notebook shell's first-directory user selection."""
+    try:
+        current = _absolute(cwd if cwd is not None else Path.cwd())
+        relative = current.relative_to(USERS_ROOT.resolve())
+    except ValueError:
+        return None
+    if not relative.parts or relative.parts[0].startswith("."):
+        return None
+    return USERS_ROOT.resolve() / relative.parts[0]
+
+
 def select_config(config_file=None, personal_root=None, *, cwd=None):
     """Choose one personal file; never fall back to the shared home config."""
     explicit = config_file if config_file is not None else os.environ.get("CRYRI_CONFIG")
@@ -142,15 +154,9 @@ def select_config(config_file=None, personal_root=None, *, cwd=None):
         _check_personal_path(root, directory=True)
         source = "personal-root"
     else:
-        current = _absolute(cwd if cwd is not None else Path.cwd())
-        shared = USERS_ROOT.resolve()
-        try:
-            relative = current.relative_to(shared)
-        except ValueError:
+        root = detect_personal_root(cwd)
+        if root is None:
             return PersonalConfig(None, None, "none")
-        if not relative.parts or relative.parts[0].startswith("."):
-            return PersonalConfig(None, None, "none")
-        root = shared / relative.parts[0]
         source = "working-directory"
     return PersonalConfig(root / ".config" / "cryri" / "credentials.toml", root, source)
 

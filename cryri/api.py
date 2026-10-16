@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 import json
 
-from cryri.statuses import normalize_status, is_terminal, TERMINAL_STATUSES
+from cryri.statuses import normalize_status, is_terminal
 from cryri.credentials import api_settings, CredentialConfigError
 
 import requests
@@ -356,7 +356,6 @@ def stream_logs(
             raise ApiError(0, "Log connection interrupted; try local archived logs or --follow.") from exc
 
 
-_FINISHED_STATUSES = TERMINAL_STATUSES
 _FOLLOW_RECONNECT_DELAY = 5  # seconds
 
 

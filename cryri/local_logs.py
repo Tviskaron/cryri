@@ -70,7 +70,7 @@ class LogEmitter:
         sys.stdout.flush()
 
 
-def emit_chunks(chunks, raw=False, max_bytes=None):
+def emit_chunks(chunks, raw=False, max_bytes=None, finish=True):
     emitter = LogEmitter(raw=raw)
     consumed = 0
     for chunk in chunks:
@@ -80,9 +80,11 @@ def emit_chunks(chunks, raw=False, max_bytes=None):
         emitter.feed(chunk)
         if max_bytes is not None and consumed >= max_bytes:
             break
-    emitter.finish()
+    if finish:
+        emitter.finish()
     if max_bytes is not None and consumed >= max_bytes:
         print("\n... preview byte limit reached; use --full for untruncated logs ...")
+    return emitter
 
 
 def _file_key(path):
@@ -170,7 +172,7 @@ class LocalLogStore:
                 tail = b"".join(suffix.splitlines(keepends=True)[-options.tail:]) if options.tail else b""
             return head, tail, max(0, size - len(head) - len(tail)), stat
 
-    def show(self, name, options=None, raw=False):
+    def show(self, name, options=None, raw=False, emitters=None):
         options = options or LogPreview()
         files = self.files(name)
         if not files:
@@ -185,18 +187,27 @@ class LocalLogStore:
         for path in selected:
             relative = path.relative_to(self.job_dir(name))
             print("--- local: {}/{} ---".format(name, relative))
+            keep_state = emitters is not None
             if options.full:
                 with path.open("rb") as stream:
                     stat = os.fstat(stream.fileno())
-                    emit_chunks(iter(lambda: stream.read(DEFAULT_MAX_BYTES), b""), raw=raw)
+                    emitter = emit_chunks(iter(lambda: stream.read(DEFAULT_MAX_BYTES), b""),
+                                          raw=raw, finish=not keep_state)
+                    offset = stream.tell()
+                reaches_eof = True
             else:
                 head, tail, omitted, stat = self._preview(path, options, budget)
-                emit_chunks([head], raw=raw)
+                emitter = emit_chunks([head], raw=raw,
+                                      finish=not keep_state or bool(tail) or bool(omitted))
                 if omitted:
                     print("\n... {} bytes omitted from the middle; use --full ...".format(omitted))
                 if tail:
-                    emit_chunks([tail], raw=raw)
-            positions[path] = (stat.st_dev, stat.st_ino, stat.st_size)
+                    emitter = emit_chunks([tail], raw=raw, finish=not keep_state)
+                offset = stat.st_size
+                reaches_eof = bool(tail) or not omitted
+            if keep_state and reaches_eof:
+                emitters[path] = emitter
+            positions[path] = (stat.st_dev, stat.st_ino, offset)
         if len(selected) < len(files):
             print("... {} additional log files omitted; increase --max-files or use --full ...".format(
                 len(files) - len(selected)))
@@ -204,9 +215,9 @@ class LocalLogStore:
 
     def follow(self, name, options=None, raw=False, get_status=None, poll_interval=1):
         options = options or LogPreview()
-        positions = self.show(name, options=options, raw=raw)
         emitters = {}
-        last_path = None
+        positions = self.show(name, options=options, raw=raw, emitters=emitters)
+        last_path = next(reversed(emitters), None)
         next_status = 0.0
         try:
             while True:

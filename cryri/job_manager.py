@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from cryri import api
 from cryri.api import ApiError
 from cryri.config import CryConfig
+from cryri.credentials import detect_personal_root
 from cryri.utils import create_run_copy, create_job_description
 from cryri.local_logs import LocalLogStore, LogPreview
 from cryri.statuses import normalize_status
@@ -133,11 +134,18 @@ class JobManager:
             cfg.container.work_dir = create_run_copy(cfg.container)
 
         job_description = create_job_description(cfg)
+        legacy = api.use_legacy_backend()
+        if legacy or api.backend_name() != "public":
+            root = detect_personal_root()
+            if root and not re.search(
+                r"(?<!\w)" + re.escape(root.name) + r"(?!\w)", job_description
+            ):
+                job_description = f"[{root.name}] {job_description}"
 
         quoted_dir = shlex.quote(cfg.container.work_dir)
         run_script = f"bash -c {shlex.quote(f'cd {quoted_dir} && {cfg.container.command}')}"
 
-        if api.use_legacy_backend():
+        if legacy:
             client_lib = _require_client_lib()
             job = client_lib.Job(
                 base_image=cfg.container.image,

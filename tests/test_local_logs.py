@@ -232,11 +232,17 @@ def test_newline_free_full_log_is_streamed_in_bounded_chunks(tmp_path, capsys):
     assert capsys.readouterr().out.count("X") == 2 * 65536
 
 
-def test_follow_preserves_split_utf8_and_lines(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("initial,appends,full", [
+    (b"", [b"[1,0]<stdout>:par\xe2", b"\x82\xactial\n"], False),
+    (b"[1,0]<stdout>:par\xe2", [b"\x82\xactial\n"], False),
+    (b"[1,0]<stdout>:par\xe2", [b"\x82\xactial\n"], True),
+])
+def test_follow_preserves_split_utf8_and_lines(tmp_path, monkeypatch, capsys, initial, appends, full):
     path = archive(tmp_path, "")
-    status = Mock(side_effect=["Running", "Running", "Stopped"])
+    path.write_bytes(initial)
+    status = Mock(side_effect=["Running"] * len(appends) + ["Stopped"])
     clock = [0]
-    fragments = iter([b"[1,0]<stdout>:par\xe2", b"\x82\xactial\n"])
+    fragments = iter(appends)
     monkeypatch.setattr("cryri.local_logs.time.monotonic", lambda: clock[0])
 
     def append(_):
@@ -245,7 +251,7 @@ def test_follow_preserves_split_utf8_and_lines(tmp_path, monkeypatch, capsys):
         clock[0] += 6
 
     monkeypatch.setattr("cryri.local_logs.time.sleep", append)
-    LocalLogStore(tmp_path).follow(JOB, get_status=status)
+    LocalLogStore(tmp_path).follow(JOB, options=LogPreview(full=full), get_status=status)
     output = capsys.readouterr().out
     assert "par€tial" in output
     assert "\ufffd" not in output

@@ -24,7 +24,7 @@ cryri inspect JOB_NAME --history
 
 ## Personal credentials on shared notebooks
 
-Credentials are optional. From `/home/jovyan/<user>/...`, Cryri looks only in `/home/jovyan/<user>/.config/cryri/credentials.toml`; it does not use the shared account's home config. Override selection with `--user-home` / `CRYRI_USER_HOME` or `--config` / `CRYRI_CONFIG`. `cryri config` shows the selected file and field sources without printing secrets. See the [personal configuration format and precedence](docs/status-and-logs.md#personal-configuration-on-shared-notebooks).
+Credentials are optional. From `/home/jovyan/<user>/...`, Cryri looks only in `/home/jovyan/<user>/.config/cryri/credentials.toml`; it does not use the shared account's home config. Override selection with `--user-home` / `CRYRI_USER_HOME` or `--config` / `CRYRI_CONFIG`. `cryri config` shows the selection without secrets. Gateway submissions add `[<user>]` to descriptions that do not already name the user; authenticated Public API submissions preserve the description. See the [personal configuration format and precedence](docs/status-and-logs.md#personal-configuration-on-shared-notebooks).
 
 ## Features
 
