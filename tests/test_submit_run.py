@@ -4,6 +4,10 @@ import subprocess
 from unittest.mock import patch, MagicMock
 
 import yaml
+import pytest
+from typer.testing import CliRunner
+from cryri import api, credentials
+from cryri.main import app
 from cryri.config import CryConfig
 from cryri.job_manager import JobManager
 
@@ -66,3 +70,42 @@ def test_submit_run_executes_command(mock_submit_job, _mock_legacy):
     assert result.returncode == 0, f"Subprocess failed with stderr: {result.stderr}"
     assert result.stderr == "", f"Subprocess produced stderr: {result.stderr}"
     assert "double quotes" in result.stdout
+
+
+@pytest.mark.parametrize("backend,description,inside,expected", [
+    ("gateway", "training", True, "[alice] training"),
+    ("gateway", "[alice] training", True, "[alice] training"),
+    ("gateway", "training #alice", True, "training #alice"),
+    ("gateway", "alice2 training", True, "[alice] alice2 training"),
+    ("gateway", None, True, None),
+    ("public", "training", True, "training"),
+    ("legacy", "training", True, "[alice] training"),
+    ("gateway", "training", False, "training"),
+])
+def test_submit_description_attribution(monkeypatch, tmp_path, backend, description, inside, expected):
+    work = credentials.USERS_ROOT / "alice" / "project"
+    work.mkdir(parents=True)
+    monkeypatch.chdir(work if inside else tmp_path)
+    # Explicit auth root overrides must not change the submitter's directory identity.
+    monkeypatch.setenv("CRYRI_USER_HOME", str(credentials.USERS_ROOT / "bob"))
+    monkeypatch.delenv("TEAM_NAME", raising=False)
+    monkeypatch.setattr(api, "use_legacy_backend", lambda: backend == "legacy")
+    monkeypatch.setattr(api, "backend_name", lambda: backend)
+    submit = MagicMock(return_value={"job_name": "created-job"})
+    client = MagicMock()
+    client.Job.return_value.submit.return_value = "created-job"
+    monkeypatch.setattr(api, "submit_job", submit)
+    monkeypatch.setattr("cryri.job_manager._require_client_lib", lambda: client)
+    job_work = tmp_path / "work"
+    job_work.mkdir()
+    job_file = tmp_path / "job.yaml"
+    job_file.write_text(yaml.safe_dump({
+        "container": {"image": "test", "command": "echo test", "work_dir": str(job_work)},
+        "cloud": {"instance_type": "test", "description": description},
+    }))
+    result = CliRunner().invoke(app, ["submit", str(job_file), "--yes"])
+    assert result.exit_code == 0, result.output
+    sent = client.Job.call_args if backend == "legacy" else submit.call_args
+    if expected is None:
+        expected = "[alice] " + str(job_work).replace("/", "-")
+    assert sent.kwargs["job_desc"] == expected

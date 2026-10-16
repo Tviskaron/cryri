@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
 from rich.text import Text
+from rich.markup import escape
 
 _SECRET_KEY_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD)", re.IGNORECASE)
 
@@ -112,6 +113,12 @@ STATUS_STYLES = {
     "Completed": "dim",
     "Failed": "bold red",
     "Pending": "bold yellow",
+    "Stopped": "dim",
+    "Terminated": "dim",
+    "Deleted": "dim",
+    "Succeeded": "dim",
+    "Error": "bold red",
+    "Unknown": "yellow",
 }
 
 
@@ -174,15 +181,15 @@ def interactive_job_select(jobs: List[Dict], action: str) -> str:
 
 
 def print_success(msg: str) -> None:
-    console.print(f"[bold green]{msg}[/bold green]")
+    console.print(f"[bold green]{escape(msg)}[/bold green]")
 
 
 def print_error(msg: str) -> None:
-    console.print(f"[bold red]{msg}[/bold red]")
+    console.print(f"[bold red]{escape(msg)}[/bold red]")
 
 
 def print_warning(msg: str) -> None:
-    console.print(f"[bold yellow]{msg}[/bold yellow]")
+    console.print(f"[bold yellow]{escape(msg)}[/bold yellow]")
 
 
 def render_job_status(job_name: str, status: str) -> None:

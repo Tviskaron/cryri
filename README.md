@@ -10,6 +10,31 @@ Install cryri directly from the repository:
 pip install git+https://github.com/Tviskaron/cryri.git
    ```
 
+## Status and logs
+
+Archived logs are preferred automatically, with bounded head/tail previews. Current MLSpace Public API support, status history, and configuration are documented in [Status and logs](docs/status-and-logs.md).
+
+```bash
+cryri logs JOB_NAME --head 40 --tail 200
+cryri logs JOB_NAME --source api --tail 100
+cryri logs JOB_NAME --full
+cryri status JOB_NAME --json
+cryri inspect JOB_NAME --history
+cryri params JOB_NAME
+cryri nodes JOB_NAME
+```
+
+`inspect` shows job metadata; `--history` adds platform phase/history. `params` retrieves launch parameters, and `nodes` retrieves job nodes. History, parameters, and nodes require Public API credentials. Select a backend with global `--backend auto|gateway|public` before the subcommand; `auto` uses the Public API when configured and otherwise keeps gateway access.
+
+## Personal credentials on shared notebooks
+
+Credentials are optional. From `/home/jovyan/<user>/...`, Cryri looks only in `/home/jovyan/<user>/.config/cryri/credentials.toml`; it does not use the shared account's home config. Override selection with `--user-home` / `CRYRI_USER_HOME` or `--config` / `CRYRI_CONFIG`. `cryri config` shows the selection without secrets. Gateway submissions add `[<user>]` to descriptions that do not already name the user; authenticated Public API submissions preserve the description. See the [personal configuration format and precedence](docs/status-and-logs.md#personal-configuration-on-shared-notebooks).
+
+```bash
+cryri config
+cryri --user-home /home/jovyan/alice config
+```
+
 ## Features
 
 ### List Running Jobs
@@ -18,7 +43,7 @@ pip install git+https://github.com/Tviskaron/cryri.git
 View all currently running jobs in the configured cloud environment:
 
 ```bash
-cryri --jobs --region SR006
+cryri jobs --region SR006
 ```
 
 ### List Available Instance Types For Cloud region
@@ -27,7 +52,7 @@ cryri --jobs --region SR006
 View all currently running jobs in the configured cloud environment:
 
 ```bash
-cryri --instance_types --region SR006
+cryri instances --region SR006
 ```
 
 
@@ -38,7 +63,7 @@ Submit a containerized job using a YAML configuration file:
 The configuration file must follow the structure defined below: 
 
 ```bash
-cryri run.yaml
+cryri submit run.yaml
 ```
 
 ```yaml
@@ -76,7 +101,7 @@ cloud:
    - Inside the folder, create a `run.yaml` file with the necessary configuration. You can use the example provided earlier as a template.  
    - Start the job using:  
      ```bash
-     cryri run.yaml
+     cryri submit run.yaml
      ```
 
 4. **Concurrent Experimentation**  
@@ -97,14 +122,14 @@ cloud:
 
 Fetch and display logs for a specific job by providing its hash (or part of it):
 ```bash
-cryri --logs b593837e6a55 --region SR006
+cryri logs b593837e6a55 --region SR006
 ```
 
 ### Kill Jobs
 
 Terminate a specific running job using its hash:
 ```bash
-cryri --kill b593837e6a55 --region SR006
+cryri kill b593837e6a55 --region SR006
 ```
 
 ### Recommended workflow with uv + docker

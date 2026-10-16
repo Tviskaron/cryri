@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml",
     "typer>=0.9.0",
     "simple-term-menu>=1.6.6",
+    "tomli>=2; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
