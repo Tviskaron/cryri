@@ -10,6 +10,18 @@ Install cryri directly from the repository:
 pip install git+https://github.com/Tviskaron/cryri.git
    ```
 
+## Status and logs
+
+Archived logs are preferred automatically, with bounded head/tail previews. Current MLSpace Public API support, status history, and configuration are documented in [Status and logs](docs/status-and-logs.md).
+
+```bash
+cryri logs JOB_NAME --head 40 --tail 200
+cryri logs JOB_NAME --source api --tail 100
+cryri logs JOB_NAME --full
+cryri status JOB_NAME --json
+cryri inspect JOB_NAME --history
+```
+
 ## Features
 
 ### List Running Jobs
@@ -18,7 +30,7 @@ pip install git+https://github.com/Tviskaron/cryri.git
 View all currently running jobs in the configured cloud environment:
 
 ```bash
-cryri --jobs --region SR006
+cryri jobs --region SR006
 ```
 
 ### List Available Instance Types For Cloud region
@@ -27,7 +39,7 @@ cryri --jobs --region SR006
 View all currently running jobs in the configured cloud environment:
 
 ```bash
-cryri --instance_types --region SR006
+cryri instances --region SR006
 ```
 
 
@@ -38,7 +50,7 @@ Submit a containerized job using a YAML configuration file:
 The configuration file must follow the structure defined below: 
 
 ```bash
-cryri run.yaml
+cryri submit run.yaml
 ```
 
 ```yaml
@@ -76,7 +88,7 @@ cloud:
    - Inside the folder, create a `run.yaml` file with the necessary configuration. You can use the example provided earlier as a template.  
    - Start the job using:  
      ```bash
-     cryri run.yaml
+     cryri submit run.yaml
      ```
 
 4. **Concurrent Experimentation**  
@@ -97,14 +109,14 @@ cloud:
 
 Fetch and display logs for a specific job by providing its hash (or part of it):
 ```bash
-cryri --logs b593837e6a55 --region SR006
+cryri logs b593837e6a55 --region SR006
 ```
 
 ### Kill Jobs
 
 Terminate a specific running job using its hash:
 ```bash
-cryri --kill b593837e6a55 --region SR006
+cryri kill b593837e6a55 --region SR006
 ```
 
 ### Recommended workflow with uv + docker

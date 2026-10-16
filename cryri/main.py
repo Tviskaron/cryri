@@ -1,4 +1,6 @@
 import re
+import json
+from enum import Enum
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -7,7 +9,9 @@ import typer
 import yaml
 from rich.prompt import Confirm
 
-from cryri import __version__
+from cryri import __version__, api
+from cryri.local_logs import LocalLogStore, LogPreview
+from cryri.statuses import is_terminal
 from cryri.api import ApiError
 from cryri.config import CryConfig, CloudConfig, DEFAULT_REGION
 from cryri.display import (
@@ -25,6 +29,18 @@ from cryri.display import (
 )
 from cryri.job_manager import JobManager, JobNotFoundError, ClientLibMissingError
 
+class LogSource(str, Enum):
+    auto = "auto"
+    local = "local"
+    api = "api"
+
+
+class ApiBackend(str, Enum):
+    auto = "auto"
+    gateway = "gateway"
+    public = "public"
+
+
 app = typer.Typer(no_args_is_help=True, rich_markup_mode="rich")
 
 
@@ -36,6 +52,10 @@ def _version_callback(value: bool):
 
 @app.callback()
 def callback(
+    ctx: typer.Context,
+    backend: Optional[ApiBackend] = typer.Option(
+        None, "--backend", help="API backend: auto, gateway, or public."
+    ),
     version: bool = typer.Option(
         False, "--version", "-v",
         help="Show cryri version and exit.",
@@ -45,6 +65,8 @@ def callback(
 ):
     """[bold cyan]cryri[/bold cyan] — Cloud job runner CLI."""
     setup_logging()
+    token = api.BACKEND_OVERRIDE.set(backend.value if backend else None)
+    ctx.call_on_close(lambda: api.BACKEND_OVERRIDE.reset(token))
 
 
 def _resolve_job_interactive(jm: JobManager, hash: Optional[str], action: str) -> str:
@@ -175,25 +197,95 @@ def init(
         print_success("Created starter main.py")
 
 
+def _read_job_name(jm, value):
+    if jm.is_full_job_name(value):
+        return value
+    job = jm.find_job_by_hash(value)
+    if not job:
+        raise JobNotFoundError("No job found matching '{}'.".format(value))
+    return job
+
+
+def _redact(value):
+    if isinstance(value, dict):
+        return {
+            k: "****" if re.search(r"KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL", k, re.I) else _redact(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
+
+
 @app.command()
 def status(
     hash: str = typer.Argument(..., help="Job hash (or partial match)."),
     region: str = typer.Option(DEFAULT_REGION, "--region", "-r", help="Cloud region."),
+    json_output: bool = typer.Option(False, "--json", help="Emit status metadata as JSON."),
+    history: bool = typer.Option(False, "--history", help="Include Public API v3 status history."),
 ):
-    """Show status of a single job."""
+    """Show job status and identify the reporting backend."""
     jm = JobManager(region)
     try:
-        with console.status("[bold green]Fetching jobs...[/bold green]"):
-            job = jm.find_job_with_status(hash)
-    except (ApiError, ClientLibMissingError) as e:
-        print_error(str(e))
+        name = _read_job_name(jm, hash)
+        job = jm.get_job_info(name, history=history)
+    except (ApiError, ClientLibMissingError, JobNotFoundError, ValueError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1)
+    if json_output:
+        typer.echo(json.dumps(_redact(job), indent=2, ensure_ascii=False))
+        return
+    render_job_status(job["job_name"], job["status"])
+    typer.echo("Source: " + job.get("status_source", "unknown"))
+    if job.get("warning"):
+        typer.echo(job["warning"], err=True)
+    details = job.get("platform_details", {}).get("status", {}).get("details", [])
+    if details and details[-1].get("message"):
+        typer.echo(details[-1]["message"])
+
+
+@app.command("inspect")
+def inspect_job(
+    hash: str = typer.Argument(..., help="Job name or partial hash."),
+    region: str = typer.Option(DEFAULT_REGION, "--region", "-r"),
+    history: bool = typer.Option(False, "--history", help="Include Public API v3 status history."),
+):
+    """Print job metadata as JSON, including its status source."""
+    jm = JobManager(region)
+    try:
+        data = jm.get_job_info(_read_job_name(jm, hash), history=history)
+        typer.echo(json.dumps(_redact(data), indent=2, ensure_ascii=False))
+    except (ApiError, ClientLibMissingError, JobNotFoundError, ValueError) as exc:
+        print_error(str(exc))
         raise typer.Exit(code=1)
 
-    if job is None:
-        print_error(f"No job found matching '{hash}'")
+
+@app.command()
+def params(
+    hash: str = typer.Argument(..., help="Job name or partial hash."),
+    region: str = typer.Option(DEFAULT_REGION, "--region", "-r"),
+):
+    """Print Public API launch parameters as JSON; secret-named fields are masked."""
+    try:
+        data = api.get_job_params(_read_job_name(JobManager(region), hash))
+        typer.echo(json.dumps(_redact(data), indent=2, ensure_ascii=False))
+    except (ApiError, ClientLibMissingError, JobNotFoundError, ValueError) as exc:
+        print_error(str(exc))
         raise typer.Exit(code=1)
 
-    render_job_status(job["job_name"], job.get("status", "unknown"))
+
+@app.command()
+def nodes(
+    hash: str = typer.Argument(..., help="Job name or partial hash."),
+    region: str = typer.Option(DEFAULT_REGION, "--region", "-r"),
+):
+    """Print Public API job node information as JSON."""
+    try:
+        data = api.get_job_nodes(_read_job_name(JobManager(region), hash))
+        typer.echo(json.dumps(_redact(data), indent=2, ensure_ascii=False))
+    except (ApiError, ClientLibMissingError, JobNotFoundError, ValueError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -308,48 +400,50 @@ def jobs(
         structured = structured[-limit:]
         console.print(f"[dim]Showing {limit} of {total} jobs. Use -n 0 to show all.[/dim]\n")
 
+    if any(j.get("status_source") == "gateway" for j in structured):
+        typer.echo("Source: gateway; reported statuses may be stale.", err=True)
     console.print(render_jobs_table(structured))
 
 
 @app.command()
 def logs(
-    hash: Optional[str] = typer.Argument(None, help="Job hash (interactive selection if omitted)."),
+    hash: Optional[str] = typer.Argument(None, help="Job hash; interactive selection if omitted."),
     region: str = typer.Option(DEFAULT_REGION, "--region", "-r", help="Cloud region."),
-    raw: bool = typer.Option(False, "--raw", help="Show raw unfiltered logs."),
-    follow: bool = typer.Option(False, "--follow", "-f", help="Follow logs, reconnecting until job finishes."),
+    raw: bool = typer.Option(False, "--raw", help="Preserve timestamps, MPI prefixes, and noise."),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Follow new output until terminal status or Ctrl-C."),
+    source: LogSource = typer.Option(LogSource.auto, "--source", help="auto prefers local files; api forces HTTP."),
+    log_dir: Optional[Path] = typer.Option(None, "--log-dir", envvar="CRYRI_LOG_DIR", help="Archive root; default ~/.mlspace-logs."),
+    head: int = typer.Option(40, "--head", min=0, help="First lines per local file."),
+    tail: int = typer.Option(200, "--tail", min=0, help="Last lines per local file, or recent API lines."),
+    max_bytes: int = typer.Option(65536, "--max-bytes", min=1, help="Total preview data budget in bytes."),
+    max_files: int = typer.Option(8, "--max-files", min=1, help="Maximum files in a local preview."),
+    full: bool = typer.Option(False, "--full", help="Stream all selected job logs without preview limits."),
 ):
-    """Show logs for a job."""
+    """Read archived logs first, with a bounded head/tail preview by default."""
     jm = JobManager(region)
-
-    if hash is not None:
-        try:
-            job_name = _resolve_job_interactive(jm, hash, "view logs")
-        except JobNotFoundError as e:
-            print_error(str(e))
-            raise typer.Exit(code=1)
-    else:
-        # No hash — show interactive selection of running jobs only
-        try:
-            with console.status("[bold green]Fetching jobs...[/bold green]"):
-                structured = jm.get_jobs_structured()
-        except (ApiError, ClientLibMissingError) as e:
-            print_error(str(e))
-            raise typer.Exit(code=1)
-
-        running = [j for j in structured if j.get("status") == "Running"]
-        if not running:
-            console.print("[dim]No running jobs found.[/dim]")
-            raise typer.Exit()
-
-        job_name = interactive_job_select(running, "view logs")
-
     try:
-        if follow:
-            jm.show_logs_follow(job_name, raw=raw)
+        preview = LogPreview(head=head, tail=tail, max_bytes=max_bytes,
+                             max_files=max_files, full=full)
+        if hash is None:
+            if source == LogSource.local:
+                records = LocalLogStore(log_dir).jobs()
+            else:
+                try:
+                    records = jm.get_jobs_structured()
+                except (ApiError, ClientLibMissingError):
+                    if source != LogSource.auto:
+                        raise
+                    records = LocalLogStore(log_dir).jobs()
+            if not records:
+                typer.echo("No jobs found.")
+                return
+            job_name = interactive_job_select(records, "view logs")
         else:
-            jm.show_logs(job_name, raw=raw)
-    except (ApiError, ClientLibMissingError) as e:
-        print_error(str(e))
+            job_name = jm.resolve_log_job(hash, source=source.value, log_dir=log_dir)
+        method = jm.show_logs_follow if follow else jm.show_logs
+        method(job_name, raw=raw, source=source.value, log_dir=log_dir, preview=preview)
+    except (ApiError, ClientLibMissingError, JobNotFoundError, OSError, ValueError) as exc:
+        print_error(str(exc))
         raise typer.Exit(code=1)
 
 
@@ -364,7 +458,7 @@ def kill(
     if hash is not None:
         try:
             job_name = _resolve_job_interactive(jm, hash, "kill")
-        except JobNotFoundError as e:
+        except (JobNotFoundError, ApiError, ClientLibMissingError, ValueError) as e:
             print_error(str(e))
             raise typer.Exit(code=1)
     else:
@@ -375,8 +469,7 @@ def kill(
             print_error(str(e))
             raise typer.Exit(code=1)
 
-        _FINISHED = {"Completed", "Failed"}
-        killable = [j for j in structured if j.get("status") not in _FINISHED]
+        killable = [j for j in structured if not is_terminal(j.get("status"))]
         if not killable:
             console.print("[dim]No active jobs found.[/dim]")
             raise typer.Exit()

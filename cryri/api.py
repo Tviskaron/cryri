@@ -4,10 +4,19 @@ import os
 import re
 import time
 from typing import Optional, List, Dict
+from functools import lru_cache
+from contextvars import ContextVar
+from datetime import datetime, timezone
+from urllib.parse import quote
+import json
+
+from cryri.statuses import normalize_status, is_terminal, TERMINAL_STATUSES
 
 import requests
 from requests.exceptions import ConnectionError, Timeout
 from rich.table import Table
+
+BACKEND_OVERRIDE = ContextVar("cryri_backend_override", default=None)
 
 _MAX_RETRIES = 3
 _RETRY_BACKOFF = 1  # seconds; doubles each retry
@@ -74,10 +83,14 @@ def _auth_headers() -> Dict[str, str]:
     }
 
 
-def _request(method: str, path: str, *, retries: int = _MAX_RETRIES, **kwargs) -> requests.Response:
+def _request(method: str, path: str, *, retries=None, base_url=None, **kwargs) -> requests.Response:
     """Make an HTTP request with automatic retry on transient failures."""
-    url = f"{_base_url()}{path}"
-    kwargs.setdefault("headers", _auth_headers())
+    url = f"{base_url or _base_url()}{path}"
+    if "headers" not in kwargs:
+        kwargs["headers"] = _auth_headers()
+    if retries is None:
+        # Never replay submissions or destructive operations after an ambiguous failure.
+        retries = _MAX_RETRIES if method.upper() in {"GET", "HEAD", "OPTIONS"} else 0
     kwargs.setdefault("timeout", 30)
 
     last_exc: Optional[Exception] = None
@@ -86,6 +99,7 @@ def _request(method: str, path: str, *, retries: int = _MAX_RETRIES, **kwargs) -
             resp = requests.request(method, url, **kwargs)
             if resp.status_code not in _RETRYABLE_STATUS_CODES or attempt == retries:
                 return resp
+            resp.close()
         except (ConnectionError, Timeout) as exc:
             last_exc = exc
             if attempt == retries:
@@ -94,6 +108,52 @@ def _request(method: str, path: str, *, retries: int = _MAX_RETRIES, **kwargs) -
         time.sleep(_RETRY_BACKOFF * (2 ** attempt))
 
     raise ApiError(0, f"Request failed after {retries + 1} attempts: {last_exc}")
+
+
+
+_PUBLIC_CREDENTIALS = ("MLSPACE_CLIENT_ID", "MLSPACE_CLIENT_SECRET", "MLSPACE_WORKSPACE_ID")
+
+
+def backend_name():
+    """Select Public API when configured; keep notebook gateway access compatible."""
+    backend = (BACKEND_OVERRIDE.get() or os.environ.get("CRYRI_API_BACKEND", "auto")).lower()
+    if backend not in {"auto", "gateway", "public"}:
+        raise ApiError(0, "CRYRI_API_BACKEND must be auto, gateway, or public.")
+    if backend == "gateway":
+        return backend
+    configured = [name for name in _PUBLIC_CREDENTIALS if os.environ.get(name)]
+    if backend == "public" or configured:
+        missing = [name for name in _PUBLIC_CREDENTIALS if not os.environ.get(name)]
+        if not (os.environ.get("MLSPACE_API_KEY") or os.environ.get("GWAPI_KEY")):
+            missing.append("MLSPACE_API_KEY (or GWAPI_KEY)")
+        if missing:
+            raise ApiError(0, "Public API configuration is incomplete: " + ", ".join(missing))
+        return "public"
+    return "gateway"
+
+
+@lru_cache(maxsize=1)
+def _configured_public_client(client_id, secret, workspace_id, api_key, origin):
+    from cryri.public_api import PublicClient
+    return PublicClient(client_id, secret, workspace_id, api_key, origin=origin)
+
+
+def _public_client():
+    if backend_name() != "public":
+        raise ApiError(
+            0, "This endpoint requires MLSpace Public API credentials: "
+            "MLSPACE_CLIENT_ID, MLSPACE_CLIENT_SECRET, MLSPACE_WORKSPACE_ID, "
+            "and MLSPACE_API_KEY (or GWAPI_KEY)."
+        )
+    return _configured_public_client(
+        *(os.environ[name] for name in _PUBLIC_CREDENTIALS),
+        os.environ.get("MLSPACE_API_KEY") or os.environ["GWAPI_KEY"],
+        os.environ.get("MLSPACE_API_URL", "https://api.ai.cloud.ru"),
+    )
+
+
+def _job_path(job_name):
+    return "/jobs/" + quote(job_name, safe="")
 
 
 # ---------------------------------------------------------------------------
@@ -127,24 +187,63 @@ def submit_job(
         "job_desc": job_desc,
         "flags": flags or {},
     }
-    resp = _request("POST", "/run_job", json=payload)
+    if backend_name() == "public":
+        return _public_client().json("POST", "/jobs", json=payload, retries=0)
+    resp = _request("POST", "/run_job", json=payload, retries=0)
     if resp.status_code != 200:
         raise ApiError(resp.status_code, resp.text)
     return resp.json()
 
 
-def list_jobs(region: Optional[str] = None) -> List[dict]:
-    """List jobs. Returns list of dicts with ``created_at``, ``job_name``, ``status``."""
-    payload: Dict = {}
-    if region:
-        payload["region"] = region
-    resp = _request("POST", "/job_list", json=payload)
-    if resp.status_code != 200:
-        raise ApiError(resp.status_code, resp.text)
-    jobs = resp.json()
-    jobs.sort(key=lambda j: j.get("created_at", ""))
-    return jobs
+def _created_timestamp(job):
+    value = job.get("created_at")
+    if value is None:
+        value = job.get("created_dt")
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp()
+        except (ValueError, OverflowError, OSError):
+            pass
+    return 0
 
+
+def list_jobs(region: Optional[str] = None) -> List[dict]:
+    """List jobs, preserving platform metadata and normalizing known status names."""
+    if backend_name() == "public":
+        jobs = []
+        offset = 0
+        while True:
+            params = {"limit": 1000, "offset": offset}
+            if region:
+                params["region"] = region
+            data = _public_client().json("GET", "/jobs", params=params)
+            if not isinstance(data, dict) or not isinstance(data.get("jobs"), list):
+                raise ApiError(502, "Public API returned an invalid jobs list.")
+            page = data["jobs"]
+            jobs.extend(page)
+            offset += len(page)
+            if not page or offset >= data.get("count", offset):
+                break
+        source = "public-v2"
+    else:
+        payload = {"region": region} if region else {}
+        resp = _request("POST", "/job_list", json=payload, retries=_MAX_RETRIES)
+        with resp:
+            if resp.status_code != 200:
+                raise ApiError(resp.status_code, resp.text)
+            jobs = resp.json()
+        if not isinstance(jobs, list):
+            raise ApiError(502, "Gateway returned an invalid jobs list.")
+        source = "gateway"
+    result = [dict(j, status=normalize_status(j.get("status")), status_source=source,
+                   created_at=_created_timestamp(j)) for j in jobs]
+    result.sort(key=lambda j: j.get("created_at") or 0)
+    return result
 
 def _clean_log_line(line: str) -> Optional[str]:
     """Strip timestamps, MPI prefixes, and tqdm bars from a log line."""
@@ -157,16 +256,59 @@ def _clean_log_line(line: str) -> Optional[str]:
     return line or None
 
 
-def get_job_status(job_name: str, region: Optional[str] = None) -> str:
-    """Get job status. Returns status string like 'Completed', 'Running', etc."""
-    payload = {"job_name": job_name}
-    if region:
-        payload["region"] = region
-    resp = _request("POST", "/job_status", json=payload)
-    if resp.status_code != 200:
-        raise ApiError(resp.status_code, resp.text)
-    return resp.json().get("job_status", "unknown")
+def get_job_info(job_name: str, region: Optional[str] = None, history: bool = False) -> dict:
+    """Get platform metadata, or an explicitly identified gateway status report."""
+    if backend_name() == "public":
+        data = _public_client().json("GET", _job_path(job_name))
+        if not isinstance(data, dict) or data.get("status") == "job not found":
+            raise ApiError(404, "Job not found: " + job_name)
+        if not data.get("status"):
+            raise ApiError(502, "Public API returned no job status.")
+        data = dict(data, status=normalize_status(data["status"]), status_source="public-v2")
+        if history:
+            # A Public API uid is not inferred from a Kubernetes job-name suffix.
+            uid = data.get("uid")
+            if not uid:
+                raise ApiError(502, "Public API returned no uid for job history.")
+            detail = _public_client().json("GET", _job_path(str(uid)), version=3)
+            if not isinstance(detail, dict) or not isinstance(detail.get("status"), dict) or not detail["status"].get("phase"):
+                raise ApiError(502, "Public API v3 returned no job phase.")
+            data["platform_details"] = detail
+            data["status"] = normalize_status(detail["status"]["phase"])
+            data["status_source"] = "public-v3"
+        return data
 
+    if history:
+        _public_client()  # Raise the actionable configuration error.
+    params = {"job": job_name}
+    if region:
+        params["region"] = region
+    resp = _request("GET", "/job_status", params=params)
+    with resp:
+        if resp.status_code != 200:
+            raise ApiError(resp.status_code, resp.text)
+        data = resp.json()
+    if not isinstance(data, dict) or not data.get("job_status"):
+        raise ApiError(502, "Gateway returned no job status.")
+    return {
+        "job_name": job_name,
+        "status": normalize_status(data["job_status"]),
+        "status_source": "gateway",
+        "warning": "Gateway status can be stale; it does not establish job liveness. "
+                   "Configure the Public API for platform status and history.",
+    }
+
+
+def get_job_status(job_name: str, region: Optional[str] = None) -> str:
+    return get_job_info(job_name, region=region)["status"]
+
+
+def get_job_params(job_name: str) -> dict:
+    return _public_client().json("GET", _job_path(job_name) + "/params")
+
+
+def get_job_nodes(job_name: str) -> dict:
+    return _public_client().json("GET", _job_path(job_name) + "/nodes")
 
 def stream_logs(
     job_name: str,
@@ -174,41 +316,35 @@ def stream_logs(
     tail: int = 0,
     verbose: bool = True,
     raw: bool = False,
+    max_bytes: Optional[int] = None,
 ) -> None:
-    """Stream logs for a job directly to stdout."""
-    payload: Dict = {
-        "job_name": job_name,
-        "tail": tail,
-        "verbose": verbose,
-        "region": region,
-    }
-    # No retry for streaming — use longer read timeout since training jobs
-    # can go quiet for minutes during evaluation/checkpointing.
-    resp = _request(
-        "POST", "/read_logs", json=payload,
-        stream=True, timeout=(10, 600), retries=0,
-    )
-    if resp.status_code != 200:
-        raise ApiError(resp.status_code, resp.text)
-    try:
-        prev_line = None
-        for chunk in resp.iter_lines():
-            if not chunk:
-                continue
-            line = chunk.decode("utf-8")
-            if raw:
-                print(line)
-                continue
-            cleaned = _clean_log_line(line)
-            if cleaned is None or cleaned == prev_line:
-                continue
-            prev_line = cleaned
-            print(cleaned)
-    except Timeout:
-        raise ApiError(0, "Log stream timed out (no data for 10 minutes). The job may have finished.")
+    """Read logs with an optional bounded preview and guaranteed response cleanup."""
+    from cryri.local_logs import emit_chunks
+
+    if backend_name() == "public":
+        params = {"tail": tail, "verbose": verbose}
+        if region:
+            params["region"] = region
+        resp = _public_client().request(
+            "GET", _job_path(job_name) + "/logs", params=params,
+            stream=True, timeout=(10, 30 if max_bytes is not None else 600), retries=0,
+        )
+    else:
+        resp = _request(
+            "POST", "/read_logs",
+            json={"job_name": job_name, "tail": tail, "verbose": verbose, "region": region},
+            stream=True, timeout=(10, 30 if max_bytes is not None else 600), retries=0,
+        )
+    with resp:
+        if resp.status_code != 200:
+            raise ApiError(resp.status_code, resp.text)
+        try:
+            emit_chunks(resp.iter_content(chunk_size=8192), raw=raw, max_bytes=max_bytes)
+        except (ConnectionError, Timeout) as exc:
+            raise ApiError(0, "Log connection interrupted; try local archived logs or --follow.") from exc
 
 
-_FINISHED_STATUSES = {"Completed", "Failed", "Error", "Killed"}
+_FINISHED_STATUSES = TERMINAL_STATUSES
 _FOLLOW_RECONNECT_DELAY = 5  # seconds
 
 
@@ -229,18 +365,12 @@ def stream_logs_follow(
         except KeyboardInterrupt:
             return
 
-        # Check if job is still running (use list_jobs — job_status endpoint is unreliable)
         try:
-            jobs = list_jobs(region=region)
-            status = "unknown"
-            for j in jobs:
-                if j.get("job_name") == job_name:
-                    status = j.get("status", "unknown")
-                    break
+            status = get_job_status(job_name, region=region)
         except ApiError:
-            status = "unknown"
+            status = "Unknown"
 
-        if status in _FINISHED_STATUSES:
+        if is_terminal(status):
             from cryri.display import render_job_status
             render_job_status(job_name, status)
             return
@@ -254,7 +384,10 @@ def stream_logs_follow(
 def kill_job(job_name: str, region: str) -> str:
     """Kill a running job. Returns status message."""
     payload = {"job_name": job_name, "region": region}
-    resp = _request("POST", "/delete_job/v2", json=payload)
+    if backend_name() == "public":
+        data = _public_client().json("DELETE", _job_path(job_name), params={"region": region}, retries=0)
+        return json.dumps(data)
+    resp = _request("POST", "/delete_job/v2", json=payload, retries=0)
     if resp.status_code != 200:
         raise ApiError(resp.status_code, resp.text)
     return resp.text
@@ -262,6 +395,18 @@ def kill_job(job_name: str, region: str) -> str:
 
 def get_instance_types(regions: str) -> Table:
     """Fetch instance types for the given region. Returns a ``rich.Table``."""
+    if backend_name() == "public":
+        data = _public_client().json("GET", "/configs", params={"cluster_type": "mt"})
+        table = Table(title="Instance Types")
+        for column in ["Cluster", "Instance Type", "Resources"]:
+            table.add_column(column)
+        for cluster in data.get("regions", []):
+            if regions and cluster.get("key") != regions:
+                continue
+            for instance in cluster.get("instances_types", []):
+                table.add_row(cluster.get("key", ""), instance.get("key", ""),
+                              json.dumps(instance.get("resource", {}), sort_keys=True))
+        return table
     resp = _request("GET", "/v1/clusters")
     if resp.status_code != 200:
         raise ApiError(resp.status_code, resp.text)
