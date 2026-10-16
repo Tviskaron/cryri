@@ -225,3 +225,17 @@ def test_log_follower_stops_for_normalized_terminal_status(monkeypatch, status):
     monkeypatch.setattr(api.time, "sleep", sleep)
     api.stream_logs_follow("job-name")
     sleep.assert_not_called()
+
+
+def test_public_catalog_uses_current_cluster_enum_and_filters_region(monkeypatch):
+    public_environment(monkeypatch)
+    client = Mock()
+    client.json.return_value = {"regions": [
+        {"key": "SR003", "instances_types": [
+            {"key": "cpu.other", "resource": {}}, {"key": "cpu.other2", "resource": {}}]},
+        {"key": "SR006", "instances_types": [{"key": "cpu.2C.8G", "resource": {"cpu": "2"}}]},
+    ]}
+    monkeypatch.setattr(api, "_public_client", lambda: client)
+    table = api.get_instance_types("SR006")
+    client.json.assert_called_once_with("GET", "/configs", params={"cluster_type": "MT"})
+    assert table.row_count == 1

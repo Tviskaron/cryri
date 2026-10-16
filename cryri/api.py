@@ -407,7 +407,7 @@ def kill_job(job_name: str, region: str) -> str:
 def get_instance_types(regions: str) -> Table:
     """Fetch instance types for the given region. Returns a ``rich.Table``."""
     if backend_name() == "public":
-        data = _public_client().json("GET", "/configs", params={"cluster_type": "mt"})
+        data = _public_client().json("GET", "/configs", params={"cluster_type": "MT"})
         table = Table(title="Instance Types")
         for column in ["Cluster", "Instance Type", "Resources"]:
             table.add_column(column)
