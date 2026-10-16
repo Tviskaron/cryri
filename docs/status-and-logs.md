@@ -43,7 +43,7 @@ The notebook gateway's single-job contract is **GET `/job_status` with query par
 
 The default backend is `auto`: use the current Public API when its credentials are configured; otherwise retain notebook gateway access. Choose explicitly with global `--backend gateway|public|auto` (before the subcommand) or `CRYRI_API_BACKEND`. An incomplete Public API configuration is an error; use explicit gateway mode if only that access is intended. `CRYRI_USE_CLIENT_LIB=1` continues selecting the older optional SDK for its existing operations.
 
-The Public API uses standard developer credentials in the process environment:
+The Public API accepts standard developer credentials from the process environment or an optional personal TOML file:
 
 - `MLSPACE_CLIENT_ID`
 - `MLSPACE_CLIENT_SECRET`
@@ -51,7 +51,51 @@ The Public API uses standard developer credentials in the process environment:
 - `MLSPACE_API_KEY`, falling back to the existing `GWAPI_KEY`
 - Optional `MLSPACE_API_URL`: HTTPS API origin, default `https://api.ai.cloud.ru`
 
-Set these through your normal secret-management mechanism. Cryri does not create credential files or persist access tokens. Tokens are cached in memory, refreshed conservatively, and refreshed once on an explicit 401. Authentication errors do not echo credentials. No additional SDK dependency is required.
+Set these through your normal secret-management mechanism or the personal configuration below. Cryri does not create credential files, export file credentials into the process/job environment, or persist access tokens. Tokens are cached in memory, refreshed conservatively, and refreshed once on an explicit 401. Authentication errors do not echo credentials. No additional SDK dependency is required.
+
+### Personal configuration on shared notebooks
+
+Cryri never automatically reads the shared account's `~/.config`, `~/.cryri`, `XDG_CONFIG_HOME`, or a project's `.env`. It mirrors the notebook's directory-based user selection: from `/home/jovyan/alice/project`, the one automatic candidate is `/home/jovyan/alice/.config/cryri/credentials.toml`. Nested working directories select the same personal root. At `/home/jovyan`, outside that tree, or inside its hidden top-level directories, no personal file is inferred. Paths use the resolved working directory; symlinks to a project therefore select its physical personal root. Automatically selected files cannot resolve outside their personal root.
+
+Choose a different location explicitly:
+
+```bash
+# Choose a personal root when calling from a shared project or elsewhere.
+cryri --user-home /home/jovyan/alice config
+cryri --user-home /home/jovyan/alice submit run.yaml
+
+# Select an alternative personal credentials file.
+cryri --config /home/jovyan/alice/.config/cryri/alternate.toml submit run.yaml
+
+# Equivalent persistent overrides; add one to your own shell setup if desired.
+export CRYRI_USER_HOME=/home/jovyan/alice
+# Or select a specific file:
+export CRYRI_CONFIG=/home/jovyan/alice/.config/cryri/credentials.toml
+```
+
+`--config` takes precedence over `CRYRI_CONFIG`. Either file selector takes precedence over personal-root selection. Otherwise `--user-home` takes precedence over `CRYRI_USER_HOME`, then Cryri infers the personal root from the working directory. It never searches other people's directories or walks up the project tree for credentials. Explicit selectors also reject shared-root credential files and hidden directories such as `/home/jovyan/.config` or `/home/jovyan/.cryri`; portable explicit paths outside the notebook tree remain supported. No shell wrapper or cache changes are needed.
+
+A missing automatically selected file (including one chosen through `--user-home`) is optional: the existing environment/gateway behavior continues. A missing explicitly selected `--config`/`CRYRI_CONFIG` file is an error, so a typo cannot silently select a different account. Empty files are allowed. Malformed files, unsupported fields, and partial Public API credentials produce an actionable error when those API settings are used. `--backend gateway` bypasses file authentication for gateway commands. Local log reads, command help, and version output do not require valid Public API credentials.
+
+An optional file looks like this (replace the placeholders locally):
+
+```toml
+[mlspace]
+client_id = "YOUR_KEY_ID"
+client_secret = "YOUR_KEY_SECRET"
+workspace_id = "YOUR_WORKSPACE_ID"
+api_key = "YOUR_WORKSPACE_API_KEY"
+# api_url = "https://api.ai.cloud.ru"
+
+[cryri]
+backend = "auto"  # auto, public, or gateway
+```
+
+The TOML field names map to the `MLSPACE_*` variables above; `backend` maps to `CRYRI_API_BACKEND`. Environment variables override file fields, including an explicitly empty value; global `--backend` overrides both. Gateway settings (`GWAPI_ADDR`, `GWAPI_KEY`, namespace) remain in the environment. `MLSPACE_API_KEY` may still fall back to `GWAPI_KEY`. Authentication uses the identity associated with the keys; a directory name does not impersonate a platform username.
+
+Use `cryri config` to inspect the selected path, selected backend, and whether fields come from the file or environment. It prints field presence and provenance, never credential values, and makes no network requests. CLI invocations keep their configuration separate; file values are reloaded for the next invocation. The file is size-limited to 64 KiB and parsed as TOML, never executed as shell code. TOML support uses the standard library on Python 3.11+ and `tomli` on older supported Python versions.
+
+Keep your real file out of Git and restrict its permissions, for example `chmod 600 /home/jovyan/alice/.config/cryri/credentials.toml`. Directory-based selection prevents accidental configuration mixing; people sharing the same Unix account still share that account's file access.
 
 Public API operations use the published contracts:
 

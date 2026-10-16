@@ -11,6 +11,7 @@ from urllib.parse import quote
 import json
 
 from cryri.statuses import normalize_status, is_terminal, TERMINAL_STATUSES
+from cryri.credentials import api_settings, CredentialConfigError
 
 import requests
 from requests.exceptions import ConnectionError, Timeout
@@ -114,17 +115,27 @@ def _request(method: str, path: str, *, retries=None, base_url=None, **kwargs) -
 _PUBLIC_CREDENTIALS = ("MLSPACE_CLIENT_ID", "MLSPACE_CLIENT_SECRET", "MLSPACE_WORKSPACE_ID")
 
 
+def _api_settings():
+    try:
+        return api_settings()
+    except CredentialConfigError as exc:
+        raise ApiError(0, str(exc)) from exc
+
+
 def backend_name():
     """Select Public API when configured; keep notebook gateway access compatible."""
-    backend = (BACKEND_OVERRIDE.get() or os.environ.get("CRYRI_API_BACKEND", "auto")).lower()
+    if BACKEND_OVERRIDE.get() == "gateway":
+        return "gateway"
+    settings = _api_settings()
+    backend = (BACKEND_OVERRIDE.get() or settings.get("CRYRI_API_BACKEND") or "auto").lower()
     if backend not in {"auto", "gateway", "public"}:
         raise ApiError(0, "CRYRI_API_BACKEND must be auto, gateway, or public.")
     if backend == "gateway":
         return backend
-    configured = [name for name in _PUBLIC_CREDENTIALS if os.environ.get(name)]
+    configured = [name for name in _PUBLIC_CREDENTIALS if settings.get(name)]
     if backend == "public" or configured:
-        missing = [name for name in _PUBLIC_CREDENTIALS if not os.environ.get(name)]
-        if not (os.environ.get("MLSPACE_API_KEY") or os.environ.get("GWAPI_KEY")):
+        missing = [name for name in _PUBLIC_CREDENTIALS if not settings.get(name)]
+        if not (settings.get("MLSPACE_API_KEY") or os.environ.get("GWAPI_KEY")):
             missing.append("MLSPACE_API_KEY (or GWAPI_KEY)")
         if missing:
             raise ApiError(0, "Public API configuration is incomplete: " + ", ".join(missing))
@@ -145,10 +156,11 @@ def _public_client():
             "MLSPACE_CLIENT_ID, MLSPACE_CLIENT_SECRET, MLSPACE_WORKSPACE_ID, "
             "and MLSPACE_API_KEY (or GWAPI_KEY)."
         )
+    settings = _api_settings()
     return _configured_public_client(
-        *(os.environ[name] for name in _PUBLIC_CREDENTIALS),
-        os.environ.get("MLSPACE_API_KEY") or os.environ["GWAPI_KEY"],
-        os.environ.get("MLSPACE_API_URL", "https://api.ai.cloud.ru"),
+        *(settings[name] for name in _PUBLIC_CREDENTIALS),
+        settings.get("MLSPACE_API_KEY") or os.environ["GWAPI_KEY"],
+        settings.get("MLSPACE_API_URL") or "https://api.ai.cloud.ru",
     )
 
 

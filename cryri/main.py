@@ -11,6 +11,7 @@ from rich.prompt import Confirm
 
 from cryri import __version__, api
 from cryri.local_logs import LocalLogStore, LogPreview
+from cryri.credentials import CURRENT_CONFIG, CredentialConfigError, current_config, select_config
 from cryri.statuses import is_terminal
 from cryri.api import ApiError
 from cryri.config import CryConfig, CloudConfig, DEFAULT_REGION
@@ -53,6 +54,12 @@ def _version_callback(value: bool):
 @app.callback()
 def callback(
     ctx: typer.Context,
+    credentials_file: Optional[Path] = typer.Option(
+        None, "--config", help="Personal credentials TOML file; overrides CRYRI_CONFIG."
+    ),
+    user_home: Optional[Path] = typer.Option(
+        None, "--user-home", help="Personal root; overrides CRYRI_USER_HOME and directory detection."
+    ),
     backend: Optional[ApiBackend] = typer.Option(
         None, "--backend", help="API backend: auto, gateway, or public."
     ),
@@ -65,8 +72,27 @@ def callback(
 ):
     """[bold cyan]cryri[/bold cyan] — Cloud job runner CLI."""
     setup_logging()
+    try:
+        selected = select_config(credentials_file, user_home)
+    except (CredentialConfigError, OSError, ValueError, RuntimeError):
+        print_error("Cannot select personal Cryri configuration; check --config and --user-home.")
+        raise typer.Exit(code=1)
+    config_token = CURRENT_CONFIG.set(selected)
+    ctx.call_on_close(lambda: CURRENT_CONFIG.reset(config_token))
     token = api.BACKEND_OVERRIDE.set(backend.value if backend else None)
     ctx.call_on_close(lambda: api.BACKEND_OVERRIDE.reset(token))
+
+
+@app.command("config")
+def show_personal_config():
+    """Show selected personal credential path and field sources, without secrets."""
+    try:
+        details = current_config().describe()
+        details["backend"] = api.backend_name()
+        typer.echo(json.dumps(details, indent=2))
+    except (CredentialConfigError, ApiError) as exc:
+        print_error(str(exc))
+        raise typer.Exit(code=1)
 
 
 def _resolve_job_interactive(jm: JobManager, hash: Optional[str], action: str) -> str:
