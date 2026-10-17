@@ -43,7 +43,7 @@ The default `auto` backend uses the Public API when configured, otherwise the no
 | Submit / paginated list | POST / GET `/public/v2/jobs` |
 | Metadata / terminate | GET / DELETE `/public/v2/jobs/{job_name}` |
 | Logs / parameters / nodes | GET `/public/v2/jobs/{job_name}/{logs,params,nodes}` |
-| Instance configurations | GET `/public/v2/configs?cluster_type=mt` |
+| Instance configurations | GET `/public/v2/configs?cluster_type=MT` |
 | Phase and history | GET `/public/v3/jobs/{uid}` |
 
 Job metadata is preserved; known status names and `created_dt` timestamps are normalized for existing filters and sorting. Reads retry transient errors. Submission and termination are never replayed after ambiguous transport/server failures. Tokens stay in memory and refresh once after an explicit 401; authentication errors do not echo secrets.

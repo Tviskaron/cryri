@@ -225,3 +225,12 @@ def test_log_follower_stops_for_normalized_terminal_status(monkeypatch, status):
     monkeypatch.setattr(api.time, "sleep", sleep)
     api.stream_logs_follow("job-name")
     sleep.assert_not_called()
+
+
+def test_public_catalog_uses_mt_cluster_type(monkeypatch):
+    public_environment(monkeypatch)
+    client = Mock()
+    client.json.return_value = {"regions": []}
+    monkeypatch.setattr(api, "_public_client", lambda: client)
+    api.get_instance_types("SR006")
+    client.json.assert_called_once_with("GET", "/configs", params={"cluster_type": "MT"})
